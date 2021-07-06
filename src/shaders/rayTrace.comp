@@ -1,0 +1,414 @@
+// compute shader
+#version 430
+
+// ------------------------------------------------------------------------------------------------
+// Adapted from the basic compute shader tutorial by Anton Gerdelan (2016):
+// https://antongerdelan.net/opengl/compute.html
+//
+// Path tracing algorithm is adapted from the C code provided by the IGS group for the
+// Advanced Computer Graphics Proseminar  (Computer Sciences dpt., University of Innsbruck),
+// which was itself largely based on the software smallpt by Kevin Beason (MIT License).
+//
+// For each local group (i.e., pixel), a ray is cast into the scene.
+// Geometry is defined by spheres.
+// Intersection points between rays and spheres are illuminated using Phong shading
+// ------------------------------------------------------------------------------------------------
+
+
+
+// size of the local work group = 1 x 1 (i.e., one pixel. 2D only, could be 3D)
+layout(local_size_x = 1/*, local_size_y = 1*/) in;
+
+// image2D input
+// declared as GL_RGBA8 (UNSIGNED_BYTE) in c++ code -> rgba8 in compute shader 
+// https://www.khronos.org/opengl/wiki/Image_Load_Store#Format_qualifiers
+layout(rgba8, binding = 0) uniform image2D img_output;
+
+
+// Other uniforms
+uniform int u_screenWidth;
+uniform int u_screenHeight;
+uniform int u_nbSamples;
+uniform int u_nbBounces;
+uniform float u_lightIntensity;
+
+uniform sampler2D u_noiseTex;
+uniform vec3 u_samples[64];
+
+// sphere structure
+struct Sphere
+{
+  	vec3 center;
+	float radius;
+	vec3 color;
+};
+
+// Array of spheres which represents geometry (Cornell box)
+// scene center at (0,0,-10), camera at (0,0,0), scene dimensions are (10, 10, 10)
+Sphere spheres[9] = Sphere[9] (	Sphere( vec3( -1e5 - 5,      0.0,      -10.0),  1e5, vec3(0.75, 0.25, 0.25) ) ,		/* Left wall */
+								Sphere( vec3(  1e5 + 5,      0.0,      -10.0),  1e5, vec3(0.25, 0.25, 0.75) ) ,		/* Right wall */
+								Sphere( vec3(      0.0,      0.0,  -1e5 - 15),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Back wall */
+								Sphere( vec3(      0.0,      0.0,  1e5 + 0.1),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Front wall (just behing the camera) */
+								Sphere( vec3(      0.0,  1e5 + 5,      -10.0),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Floor */
+								Sphere( vec3(      0.0, -1e5 - 5,      -10.0),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Ceiling */
+								Sphere( vec3(     -2.5,      3.0,      -12.5),  2.0, vec3(0.95,  0.5, 0.25) ) ,		/* Mirror sphere */
+								Sphere( vec3(      2.5,      3.0,       -8.5),  1.5, vec3(0.95,  0.5, 0.25) ) ,		/* Glass sphere */
+								Sphere( vec3(      0.0,     -4.5,      -10.0), 0.25, vec3( 1.0,  1.0,  1.0) ) 		/* Light source */
+							  );	    
+
+
+// light source position
+vec3 lightPos = vec3(0.0, 0.0, -10.0);
+
+float eps = 1e-4;
+
+
+// Calculate if there is a ray/sphere intersection and return factor t 
+// intesection x = _rayOrig + t * _rayDir
+float hasIntersect(vec3 _rayOrig, vec3 _rayDir, vec3 _sphereCenter, float _sphereRadius)
+{
+	// Check for ray-sphere intersection by solving for t:
+    //       	t^2 * d.d + 2 * t * (c2o).d + (c2o).(c2o) - R^2 = 0 
+	//
+	// solutions of the form:
+	// 			t = (c2o).d +/- sqrt( ((c2o).d)^2 - ( c2o)^2 - R^2 ) )
+	
+	float t = 0.0;
+	
+	// define vector between  ray origin and sphere center
+	vec3 c2o = _sphereCenter - _rayOrig;
+	float b = dot(c2o , _rayDir);
+	
+	float radicant = (b * b) -  dot(c2o, c2o) + (_sphereRadius * _sphereRadius);
+
+	if(radicant < 0.0)
+	{
+		// no intersection
+		return 0.0;
+	}
+	else
+	{
+		// intersection: two roots possible
+		radicant = sqrt(radicant);
+	}
+	
+	// check smaller root first
+	t = b - radicant;
+	// if t > 0
+	if( t > eps) 
+	{
+		return t;
+	}
+	
+	// check second root
+	t = b + radicant;
+	if( t > eps) 
+	{
+		return t;
+	}
+	
+	return 0.0;	
+
+}
+
+// Calculate a random reflection vector.
+// Direction of reflection is randomly sampled in a hemisphere around surface normal.
+vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cptBounce, int _cptSample)
+{
+	// RANDOM ROTATION:
+	
+	// scale factor between noise texture (4x4) and screen image
+	vec2 noiseScale = vec2(float(_dims.x)/ 4.0, float(_dims.y)/ 4.0);
+	// UV coords of the current point in the noise texture 
+	vec2 noiseTexCoords = vec2( float(_pixelCoords.x)/float(_dims.x), float(_pixelCoords.y)/float(_dims.y) ) * noiseScale;
+	// read random direction vector from noise texture
+	vec3 randomVec = texture(u_noiseTex, noiseTexCoords).xyz; 
+	
+	// If the normal vector is aligned with X or Y axis, the tangent will always be the same, and therefore the TBN matrix as well.
+	// We avoid that by switching randomVec coords in such a case
+	if( abs(_normalVec.x) > abs(_normalVec.y) && abs(_normalVec.x) > abs(_normalVec.z) )
+	{
+		randomVec = vec3(randomVec.z, randomVec.y, randomVec.x);
+	}
+	else if( abs(_normalVec.y) > abs(_normalVec.x) && abs(_normalVec.y) > abs(_normalVec.z) )
+	{
+		randomVec = vec3(randomVec.x, randomVec.z, randomVec.y);
+	}
+	randomVec = normalize(randomVec);
+	
+	
+	// BUILD TBN MATRIX:
+	
+	// Tangent is defined as the tangential component of the random vector.
+	// This way the TBN matrix includes a random rotation alon normal axis
+	vec3 tangent = normalize(randomVec - _normalVec * dot(randomVec, _normalVec));
+	vec3 bitangent = cross(_normalVec, tangent);
+	mat3 TBN = mat3(tangent, bitangent, _normalVec); 
+	
+	// RANDOM DIRECTION:
+	
+	// 64 randomly sampled vectors (in tangent space) are given in u_samples.
+	// Given the coords of current pixel, we calculate an index in [0;64] to get on of these vectors
+	int index = ( ( _pixelCoords.x + (_dims.y - _pixelCoords.y) ) * _pixelCoords.y + _cptBounce + _cptSample) % 64 ;
+	// Random vector is multiplied by TBN so its coords are transformed from tangent space to view space.
+	// Camera is at origin, therefore there is no difference between view space and world space.
+	// TBN contains random rotation. The combination of randomly sampled direction and randomly sampled rotation give a pseudo random vector.
+	vec3 sampleVec = TBN * u_samples[index];
+	
+	return normalize(sampleVec);
+}
+				
+				
+
+
+// Compute lighting
+vec4 phongShading(vec3 _normalVec, vec3 _lightVec, vec3 _halfVec, vec3 _color)
+{
+	// diffuse term
+	float diffFactor = max(0.0, dot(_normalVec, _lightVec));
+	vec3 diffuse = _color * diffFactor;
+	
+	// specular term
+	float specularPower = 128.0;
+    float specFact = pow(max(0.0, dot(_normalVec, _halfVec)), specularPower); // add max to remove black artifacts
+	specFact = min(1.0f, specFact); // make sure max specular specFact is 1
+	vec3 specular = vec3(1.0) * specFact; // specular color is pure white
+	
+	return vec4(diffuse.rgb /*+ specular.rgb*/, 1.0);
+}
+
+
+// clamp the components of a color to [0,1]
+vec3 clamp3(vec3 _color)
+{
+	vec3 color = _color;
+	
+	if(color.r < 0)
+		color.r = 0;
+	else if(color.r > 1)
+		color.r = 1;
+	
+	if(color.g < 0)
+		color.g = 0;
+	else if(color.g > 1)
+		color.g = 1;
+	
+	if(color.b < 0)
+		color.b = 0;
+	else if(color.b > 1)
+		color.b = 1;
+
+	return color;
+}
+
+
+
+void main() 
+{
+	// screen aspect ratio
+	float aspectRatio = float(u_screenWidth) / float(u_screenHeight);
+	
+	// focal length
+	float focal = 3;
+	
+	// base pixel colour for image
+	vec4 pixel_color = vec4(0.0, 0.0, 0.0, 1.0);
+	// get index in global work group i.e x,y position
+	ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
+
+
+	// map image pixels to camera viewport
+	float max_x = 2.5 * aspectRatio;
+	float max_y = 2.5;
+	// fetch image dimensions
+	ivec2 dims = imageSize(img_output); 
+	// transform pixel coords to normalized coords in image plan (with origin at center)
+	float x = (float(pixel_coords.x  - dims.x / 2 ) / dims.x);
+	float y = (float(pixel_coords.y  - dims.y / 2 ) / dims.y);
+
+
+	// for each sample
+	for(int cptSample = 0; cptSample < u_nbSamples; cptSample++)
+	{	
+		// init sample color to black
+		vec4 sample_color = vec4(0.0, 0.0, 0.0, 1.0);
+		
+		// define ray (origin and direction ) for each pixel
+		vec3 ray_orig = vec3(x * max_x, y * max_y, 0.0);
+		vec3 ray_dir = normalize( vec3(ray_orig.x, ray_orig.y, - focal)  );
+		
+		// position and normal of hit point
+		vec3 pos = vec3(0.0);
+		vec3 normalVec = vec3(0.0);
+		
+		//for each bounce
+		bool stop = false;
+		for(int cptBounce = 0; cptBounce < u_nbBounces && !stop; cptBounce++)
+		{
+			
+			float minT = 1e20;
+			int idSphere = -1;
+			// for each sphere in the scene
+			for(int i = 0; i<spheres.length(); i++)
+			{
+				// intersection x = ray_orig + t * ray_dir
+				float t = hasIntersect(ray_orig, ray_dir, spheres[i].center, spheres[i].radius);
+				
+				// if there is a ray/sphere intersection
+				if(t != 0.0 && t<minT) 
+				{
+					// the smallest t found corresponds to the closest sphere
+					minT = t;
+					idSphere = i;
+				}
+			} // end for each sphere	
+			
+			// if a sphere was hit
+			if(idSphere != -1)
+			{
+				if(idSphere == spheres.length()-1)
+				{
+					// stop now if we hit the light source
+					stop = true;
+				}
+				else
+				{
+					// get sphere color
+					vec3 albedoColor = spheres[idSphere].color;
+					
+					// hitpoint coords
+					pos = ray_orig + minT * ray_dir;
+					// surface normal
+					normalVec = normalize(pos - spheres[idSphere].center);
+					// light vector
+					vec3 lightVec = normalize(lightPos - spheres[idSphere].center);
+					// view vector (camera is at origin)
+					vec3 viewVec = normalize(-pos);
+					// half vector
+					vec3 halfVec = normalize(lightVec + viewVec);
+					
+					// shoot shadow ray between hitpoint and light source
+					float tShadow = 0.0;
+					bool hit = false;
+					// for each sphere (except light bulb !)
+					for(int j = 0; j<spheres.length()-1; j++)
+					{
+						tShadow = hasIntersect(pos + 0.015*normalVec, normalize(vec3(lightPos - pos)), spheres[j].center, spheres[j].radius);
+						
+						if(tShadow != 0.0 && tShadow < length(lightPos - pos) )
+						{
+							hit = true;
+						}
+					}
+					// campute lighting if hitpoint is not in shadow	
+					if(hit == false)
+					{
+						// @@
+						float cos_a_max = sqrt(1.0 - spheres[spheres.length()-1].radius * spheres[spheres.length()-1].radius / dot( (pos - spheres[spheres.length()-1].center),(pos-spheres[spheres.length()-1].center) ) );
+						float omega = 2 * 3.14 * (1 - cos_a_max);
+
+						// Add diffusely reflected light from light source; note constant BRDF 1/PI 
+						sample_color.rgb = sample_color.rgb + clamp3( albedoColor * (u_lightIntensity * dot(lightVec, normalVec) * omega) * (1.0/3.14) ); 
+						
+						//sample_color = sample_color + phongShading(normalVec, lightVec, halfVec, albedoColor);
+					}
+
+				}
+				
+			} // end if hit
+			else
+			{
+				// stop now if no sphere is hit
+				stop = true;
+			}
+			
+			// build reflected ray
+			
+			// origin is hitpoint ( add normal offset to avoid shadow acnee)
+			ray_orig = pos + 0.015 * normalVec;
+			
+			
+			
+			if(idSphere == spheres.length()-3)
+			{
+				// If the hitpoint belongs to mirror sphere:
+				// perfect reflection (mirror-like)
+				// http://paulbourke.net/geometry/reflected/
+				ray_dir = normalize( ray_dir - normalVec * 2 * dot(normalVec , ray_dir) );
+			}
+			else if(idSphere == spheres.length()-2)
+			{
+				vec3 normalInit = normalVec;
+				bool isEntering = true;
+				if (dot(normalVec, ray_dir) >= 0.0)
+				{
+					// reverse normal when the ray comes from INSIDE the sphere
+					normalVec = -1.0 * normalVec;
+					isEntering = false;
+				}
+					
+					
+				// If the hitpoint belongs to transparent sphere:
+				// 1. reflection (mirror-like)
+				vec3 reflec = normalize( ray_dir - normalInit * 2 * dot(normalInit , ray_dir) );
+				// 2. refraction:
+				float nc = 1.0;                        // Index of refraction of air (approximately)
+				float nt = 1.5;                      // Index of refraction of glass (approximately)
+				float nnt;
+
+				if(isEntering)      // Set ratio depending on hit from inside or outside 
+					nnt = nc/nt;
+				else
+					nnt = nt/nc;
+
+				float ddn = dot(ray_dir, normalVec);
+				float cos2t = 1 - nnt * nnt * (1 - ddn*ddn);
+
+				// Check for total internal reflection, if so only reflect 
+				if(cos2t < 0.0)
+				{
+					ray_dir = reflec;
+				}
+				else 
+				{
+					// Otherwise reflection and/or refraction occurs 
+					vec3 tdir;
+
+					// Determine transmitted ray direction for refraction 
+					if(isEntering)
+					{
+						ray_orig = pos - 0.015 * normalInit;
+						tdir = normalize(ray_dir * nnt - normalInit * (ddn * nnt + sqrt(cos2t)));
+						
+					}
+					else
+					{
+						ray_orig = pos + 0.015 * normalInit;
+						tdir = normalize(ray_dir * nnt + normalInit * (ddn * nnt + sqrt(cos2t)));
+					}
+					
+					ray_dir = tdir;
+				}
+			}
+			else
+			{
+				// Lambertian material (uniform reflection in all direction, simulated by average of several random reflections (Monte-Carlo)
+				ray_dir = randomReflection(normalVec, dims, pixel_coords, cptBounce, cptSample);
+			}
+
+			
+			
+		} // end for each bounce
+		
+		
+		sample_color = sample_color / float(u_nbBounces) ;
+		
+		pixel_color = pixel_color + sample_color;
+
+	} // end for each sample
+
+	// output to a specific pixel in the image
+	imageStore(img_output, pixel_coords, pixel_color / float(u_nbSamples) );
+
+
+}

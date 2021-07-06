@@ -1,0 +1,375 @@
+/*********************************************************************************************************************
+ *
+ * tools.h
+ *
+ * misc. functions
+ * 
+ * Ray_compute
+ * Ludovic Blache
+ *
+ *********************************************************************************************************************/
+
+
+#ifndef TOOLS_H
+#define TOOLS_H
+
+
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <random>
+
+#define GLM_FORCE_RADIANS
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+
+
+        /*------------------------------------------------------------------------------------------------------------+
+        |                                         READ AND COMPILE SHADERS                                            |
+        +------------------------------------------------------------------------------------------------------------*/
+
+
+/*!
+* \fn readShaderSource
+* \brief read shader program and copy it in a string
+* \param _filename : shader file name
+* \return string containing shader program
+*/
+std::string readShaderSource(const std::string& _filename)
+{
+    std::ifstream file(_filename);
+    std::stringstream stream;
+    stream << file.rdbuf();
+
+    return stream.str();
+}
+
+
+
+/*!
+* \fn showShaderInfoLog
+* \brief print out shader info log (i.e. compilation errors)
+* \param _shader : shader
+*/
+void showShaderInfoLog(GLuint _shader)
+{
+    GLint infoLogLength = 0;
+    glGetShaderiv(_shader, GL_INFO_LOG_LENGTH, &infoLogLength);
+    std::vector<char> infoLog(infoLogLength);
+    glGetShaderInfoLog(_shader, infoLogLength, &infoLogLength, &infoLog[0]);
+    std::string infoLogStr(infoLog.begin(), infoLog.end());
+    std::cerr << "[SHADER INFOLOG] " << infoLogStr << std::endl;
+}
+
+
+
+/*!
+* \fn showProgramInfoLog
+* \brief print out program info log (i.e. linking errors)
+* \param _program : program
+*/
+void showProgramInfoLog(GLuint _program)
+{
+    GLint infoLogLength = 0;
+    glGetProgramiv(_program, GL_INFO_LOG_LENGTH, &infoLogLength);
+    std::vector<char> infoLog(infoLogLength);
+    glGetProgramInfoLog(_program, infoLogLength, &infoLogLength, &infoLog[0]);
+    std::string infoLogStr(infoLog.begin(), infoLog.end());
+    std::cerr << "[PROGRAM INFOLOG] " << infoLogStr << std::endl;
+}
+
+
+
+/*!
+* \fn loadShaderProgram
+* \brief load shader program from shader files
+* \param _vertShaderFilename : vertex shader filename
+* \param _fragShaderFilename : fragment shader filename
+*/
+GLuint loadShaderProgram(const std::string& _vertShaderFilename, const std::string& _fragShaderFilename, const std::string& _vertHeader="", const std::string& _fragHeader="")
+{
+    // read headers
+    std::string vertHeaderSource, fragHeaderSource;
+    vertHeaderSource = readShaderSource(_vertHeader);
+    fragHeaderSource = readShaderSource(_fragHeader);
+
+
+    // Load and compile vertex shader
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    std::string vertexShaderSource = readShaderSource(_vertShaderFilename);
+    if(!_vertHeader.empty() )
+    {
+        // if headers are provided, add them to the shader
+        const char *vertSources[2] = {vertHeaderSource.c_str(), vertexShaderSource.c_str()};
+        glShaderSource(vertexShader, 2, vertSources, nullptr);
+    }
+    else
+    {
+        // if no header provided, the shader is contained in a single file
+        const char *vertexShaderSourcePtr = vertexShaderSource.c_str();
+        glShaderSource(vertexShader, 1, &vertexShaderSourcePtr, nullptr);
+    }
+    glCompileShader(vertexShader);
+    GLint success = 0;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) 
+    {
+        std::cerr << "[ERROR] loadShaderProgram(): Vertex shader compilation failed:" << std::endl;
+        showShaderInfoLog(vertexShader);
+        glDeleteShader(vertexShader);
+        return 0;
+    }
+
+
+    // Load and compile fragment shader
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    std::string fragmentShaderSource = readShaderSource(_fragShaderFilename);
+    if(!_fragHeader.empty() )
+    {
+        // if headers are provided, add them to the shader
+        const char *fragSources[2] = {fragHeaderSource.c_str(), fragmentShaderSource.c_str()};
+        glShaderSource(fragmentShader, 2, fragSources, nullptr);
+    }
+    else
+    {
+        // if no header provided, the shader is contained in a single file
+        const char *fragmentShaderSourcePtr = fragmentShaderSource.c_str();
+        glShaderSource(fragmentShader, 1, &fragmentShaderSourcePtr, nullptr);
+    }
+    glCompileShader(fragmentShader);
+    success = 0;
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) 
+    {
+        std::cerr << "[ERROR] loadShaderProgram(): Fragment shader compilation failed:" << std::endl;
+        showShaderInfoLog(fragmentShader);
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+        return 0;
+    }
+
+
+    // Create program object
+    GLuint program = glCreateProgram();
+
+    // Attach shaders to the program
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+
+
+    // Link program
+    glLinkProgram(program);
+
+    // Check linking status
+    success = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) 
+    {
+        std::cerr << "[ERROR] loadShaderProgram(): Linking failed:" << std::endl;
+        showProgramInfoLog(program);
+        glDeleteProgram(program);
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+        return 0;
+    }
+
+    // Clean up
+    glDetachShader(program, vertexShader);
+    glDetachShader(program, fragmentShader);
+
+    return program;
+}
+
+
+
+GLuint loadCompShaderProgram(const std::string& _compShaderFilename)
+{
+    // create compute shader
+    GLuint compShader = glCreateShader(GL_COMPUTE_SHADER);
+
+    // read shader
+    std::string compShaderSource = readShaderSource(_compShaderFilename);
+    const char *compShaderSourcePtr = compShaderSource.c_str();
+    glShaderSource(compShader, 1, &compShaderSourcePtr, nullptr);
+
+    // compile shader
+    glCompileShader(compShader);
+
+    // check for error
+    GLint success = 0;
+    glGetShaderiv(compShader, GL_COMPILE_STATUS, &success);
+    if (!success) 
+    {
+        std::cerr << "[ERROR] loadCompShaderProgram(): Compute shader compilation failed:" << std::endl;
+        showShaderInfoLog(compShader);
+        glDeleteShader(compShader);
+        return 0;
+    }
+
+
+    // Create program object
+    GLuint program = glCreateProgram();
+
+    // Attach shader to the program
+    glAttachShader(program, compShader);
+
+    // Link program
+    glLinkProgram(program);
+
+    // Check linking status
+    success = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) 
+    {
+        std::cerr << "[ERROR] loadShaderProgram(): Linking failed:" << std::endl;
+        showProgramInfoLog(program);
+        glDeleteProgram(program);
+        glDeleteShader(compShader);
+        return 0;
+    }
+
+    // Clean up
+    glDetachShader(program, compShader);
+
+
+    return program;
+}
+
+
+        /*------------------------------------------------------------------------------------------------------------+
+        |                                               GENERATE TEXTURES                                             |
+        +------------------------------------------------------------------------------------------------------------*/
+
+
+// Init screen texture
+void buildScreenTex(GLuint *_screenTex, unsigned int _texWidth, unsigned int _texHeight)
+{
+
+    // generate texture
+    glGenTextures(1, _screenTex);
+    // bind texture
+    glBindTexture(GL_TEXTURE_2D, *_screenTex);
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    
+    // create and empty texture with given dimensions
+    // GL_RGBA8 (UNSIGNED_BYTE) -> declared as rgba8 in compute shader 
+    // https://www.khronos.org/opengl/wiki/Image_Load_Store#Format_qualifiers
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  _texWidth, _texHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+}
+
+
+
+
+/*
+ * cf. https://learnopengl.com/Advanced-Lighting/SSAO
+ */
+
+float lerp(float a, float b, float f)
+{
+    return a + f * (b - a);
+}  
+
+// Compute a list of randomly sampled 3D vecors
+std::vector<glm::vec3> buildRandKernel()
+{
+    // generate sample kernel 
+    std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+    std::vector<glm::vec3> ssaoKernel;
+
+    int i = 0;
+    while(i < 64)//for (unsigned int i = 0; i < 64; ++i)
+    {
+        glm::vec3 sample( randomFloats(generator) * 2.0 - 1.0, 
+                          randomFloats(generator) * 2.0 - 1.0, 
+                          randomFloats(generator) );
+        if( glm::length(sample) <= 1.0)
+        {
+            sample  = glm::normalize(sample);
+            sample *= randomFloats(generator);
+            float scale = (float)i / 64.0f; 
+
+            // scale samples s.t. they're more aligned to center of kernel
+            scale = lerp(0.1f, 1.0f, scale * scale);
+            //sample *= scale;                      // remove artifacts !!!
+            ssaoKernel.push_back(sample);  
+            i++;
+
+        }
+    }
+
+    return ssaoKernel;
+}
+
+
+// build small texture with randomly sampled 2D directions
+void buildKernelRot(GLuint *_noiseTex)
+{
+    std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+
+    //create a 4x4 array of random rotation vectors oriented around the tangent-space surface normal
+    std::vector<glm::vec3> ssaoNoise;
+    for (unsigned int i = 0; i < 16; i++)
+    {
+        glm::vec3 noise( randomFloats(generator) * 2.0 - 1.0, 
+                         randomFloats(generator) * 2.0 - 1.0, 
+                         0.0f ); 
+
+        ssaoNoise.push_back(noise);
+    } 
+
+    glGenTextures(1, _noiseTex);
+    glBindTexture(GL_TEXTURE_2D, *_noiseTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);  
+}
+
+
+        /*------------------------------------------------------------------------------------------------------------+
+        |                                                     MISC.                                                   |
+        +------------------------------------------------------------------------------------------------------------*/
+
+// Get Work groups info for compute shader
+void checkWorkGroups()
+{
+    // work group count
+    int work_grp_count[3];
+
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_count[0]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &work_grp_count[1]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &work_grp_count[2]);
+
+    std::cout << "max global (total) work group counts x: " << work_grp_count[0] << "  y: " <<  work_grp_count[1] << "  z: " <<  work_grp_count[2] << std::endl;
+
+
+    // work group size
+    int work_grp_size[3];
+
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size[0]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &work_grp_size[1]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &work_grp_size[2]);
+
+    std::cout << "max local (in one shader) work group sizes x: " << work_grp_size[0] << "  y: " <<  work_grp_size[1] << "  z: " <<  work_grp_size[2] << std::endl;
+
+
+    // max nb group work invocation
+    int work_grp_inv;
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
+
+    std::cout << "max local work group invocations: " << work_grp_inv << std::endl;
+
+}
+#endif // TOOLS_H
