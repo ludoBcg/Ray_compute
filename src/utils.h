@@ -1,8 +1,8 @@
 /*********************************************************************************************************************
  *
- * tools.h
+ * utils.h
  *
- * misc. functions
+ * helper functions
  * 
  * Ray_compute
  * Ludovic Blache
@@ -10,8 +10,8 @@
  *********************************************************************************************************************/
 
 
-#ifndef TOOLS_H
-#define TOOLS_H
+#ifndef UTILS_H
+#define UTILS_H
 
 
 #include <vector>
@@ -372,4 +372,4 @@ void checkWorkGroups()
     std::cout << "max local work group invocations: " << work_grp_inv << std::endl;
 
 }
-#endif // TOOLS_H
+#endif // UTILS_H

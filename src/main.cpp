@@ -26,7 +26,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#include "tools.h"
+#include "utils.h"
 #include "drawablemesh.h"
 
 
@@ -42,7 +42,7 @@ float m_lightIntensity = 1000.0f;   /*!<  light emission */
 
 
 // 3D objects
-DrawableMesh* m_drawQuad;       /*!<  drawable object: screen quad */
+std::unique_ptr<DrawableMesh> m_drawQuad;   /*!<  drawable object: screen quad */
 
 GLuint m_defaultVAO;            /*!<  default VAO */
 
@@ -76,41 +76,6 @@ int main(int argc, char** argv);
 
 
 
-
-GLuint load2DTexture(const std::string& _filename, bool _repeat)
-{
-    std::vector<unsigned char> data;
-    unsigned width, height;
-    unsigned error = lodepng::decode(data, width, height, _filename);
-    if (error != 0) 
-    {
-        std::cerr << "[ERROR] DrawableMesh::load2DTexture(): " << lodepng_error_text(error) << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    if(!_repeat)
-    {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-    else
-    {
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );  
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT ); 
-    }
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &(data[0]));
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    return texture;
-}
-
-
-
     /*------------------------------------------------------------------------------------------------------------+
     |                                                      INIT                                                   |
     +-------------------------------------------------------------------------------------------------------------*/
@@ -128,10 +93,10 @@ void initialize()
         
 
     // setup screen quad rendering
-    m_drawQuad = new DrawableMesh;
+    m_drawQuad = std::make_unique<DrawableMesh>();
     m_drawQuad->createQuadVAO();
 
-    m_drawQuad->loadAlbedoTex( modelDir + "UVchecker.png" );
+    //m_drawQuad->loadAlbedoTex( modelDir + "UVchecker.png" );
 
     // init screen texture
     buildScreenTex(&m_screenTex, TEX_WIDTH, TEX_HEIGHT);
@@ -233,7 +198,7 @@ void displayScreen()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
  
 
-        // draw scrren quad with texture
+        // draw screen quad with texture
         m_drawQuad->drawScreenQuad(m_programQuad, m_screenTex, false);
        
 }
@@ -310,7 +275,7 @@ void runGUI()
         float frameRate = ImGui::GetIO().Framerate;
         ImGui::Text("FrameRate: %.3f ms/frame (%.1f FPS)", 1000.0f / frameRate, frameRate);
 
-        ImGui::SliderInt("Samples per pixel", &m_nbSamples, 1, 4);
+        ImGui::SliderInt("Samples per pixel", &m_nbSamples, 1, 5);
 
         ImGui::SliderInt("Number of bounces", &m_nbBounces, 1, 5);
 
