@@ -21,7 +21,7 @@ namespace pathTracing
     const double focal_depth = 65.0;   // distance between center of lens anf focal plane
 
     // Scene geometry to render (spheres or triangles)
-    const bool useTriangles = false;
+    const bool useTriangles = true;
 
     // Path Tracing parameters
     const unsigned int maxDepth = 5;
@@ -29,18 +29,14 @@ namespace pathTracing
 
 
     
-    bool IntersectLightSource(const Ray& ray, double& t)
+    bool IntersectLightSource(const Ray& ray)
     {
-        t = 1e20;
-
         double d = LightSource.Intersect(ray);
 
-        if (d > 0.0 && d < t)
-        {
-            t = d;
-        }
+        if (d > 0.0)
+            return true;
 
-        return t < 1e20;
+        return false;
     }
 
     /*
@@ -236,8 +232,7 @@ namespace pathTracing
             l = l.Normalized();
 
             // Shoot shadow ray, check if intersection is with light source
-            //if (IntersectSpheres(Ray(hitpoint,l), t, id) && id==i)
-            if (IntersectLightSource(Ray(hitpoint, l), t))
+            if ( IntersectLightSource(Ray(hitpoint, l)) )
             {
                 //solid angle (on a unit sphere)
                 double omega = 2 * M_PI * (1 - cos_a_max);
