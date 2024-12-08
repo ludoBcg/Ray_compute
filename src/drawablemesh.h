@@ -12,8 +12,8 @@
 #ifndef DRAWABLEMESH_H
 #define DRAWABLEMESH_H
 
-#define QT_NO_OPENGL_ES_2
-#include <GL/glew.h>
+//#define QT_NO_OPENGL_ES_2
+//#include <GL/glew.h>
 
 #include <lodepng.h>
 
@@ -23,8 +23,8 @@
 #include <fstream>
 #include <sstream>
 
-#define GLM_FORCE_RADIANS
-#include <glm/glm.hpp>
+#include "utils.h"
+
 
 // The attribute locations we will use in the vertex shader
 enum AttributeLocation 

@@ -17,16 +17,10 @@
 #include <cstdlib>
 #include <algorithm>
 
-// OpenGL includes
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#include "utils.h"
 #include "drawablemesh.h"
 
 
@@ -43,8 +37,12 @@ float m_lightIntensity = 1000.0f;   /*!<  light emission */
 
 // 3D objects
 std::unique_ptr<DrawableMesh> m_drawQuad;   /*!<  drawable object: screen quad */
+std::vector<Sphere> m_spheres;              /*!<  Cornell box sphere geometry */
 
 GLuint m_defaultVAO;            /*!<  default VAO */
+GLuint m_uboSpheres;            /*!<  Sphere geometry Uniform Buffer Object */
+GLuint m_ubo;
+
 
 // Textures
 GLuint m_screenTex;             /*!< Destination texture for screen-space processing (stores final lighting result) */
@@ -75,22 +73,33 @@ void runGUI();
 int main(int argc, char** argv);
 
 
-
     /*------------------------------------------------------------------------------------------------------------+
     |                                                      INIT                                                   |
     +-------------------------------------------------------------------------------------------------------------*/
 
 
 void initialize()
-{   
+{
+    // Cornell box geometry described as spheres
+    m_spheres = { Sphere( glm::vec3( -1e5 - 5,      0.0,      -10.0), glm::vec3(0.75, 0.25, 0.25), 1e5 ) ,	/* Left wall */
+				  Sphere( glm::vec3(  1e5 + 5,      0.0,      -10.0), glm::vec3(0.25, 0.25, 0.75), 1e5 ) ,	/* Right wall */
+				  Sphere( glm::vec3(      0.0,      0.0,  -1e5 - 15), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Back wall */
+				  Sphere( glm::vec3(      0.0,      0.0,  1e5 + 0.1), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Front wall (just behing the camera) */
+				  Sphere( glm::vec3(      0.0,  1e5 + 5,      -10.0), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Floor */
+				  Sphere( glm::vec3(      0.0, -1e5 - 5,      -10.0), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Ceiling */
+				  Sphere( glm::vec3(     -2.5,      3.0,      -12.5), glm::vec3(0.95,  0.5, 0.25), 2.0 ) ,	/* Mirror sphere */
+			      Sphere( glm::vec3(      2.5,      3.0,       -8.5), glm::vec3(0.95,  0.5, 0.25), 1.5 ) ,	/* Glass sphere */
+				  Sphere( glm::vec3(      0.0,     -4.5,      -10.0), glm::vec3( 1.0,  1.0,  1.0), 0.25 ) 	/* Light source */					 
+    };
+
+    assert(m_spheres.size() == NB_SPHERES);
 
     // Setup background color
     glClearColor(0.0f, 0.0f, 0.0f, 0.0);
 
     // Enable depth testing
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);    
-        
+    glDepthFunc(GL_LESS);
 
     // setup screen quad rendering
     m_drawQuad = std::make_unique<DrawableMesh>();
@@ -106,8 +115,10 @@ void initialize()
     m_programQuad = loadShaderProgram(shaderDir + "quadTex.vert", shaderDir + "quadTex.frag");
     m_programRay = loadCompShaderProgram(shaderDir + "rayTrace.comp");
 
-    m_ssaoKernel = buildRandKernel();
-    buildKernelRot(&m_noiseTex); 
+    buildRandKernel(m_ssaoKernel);
+    buildKernelRot(&m_noiseTex);
+
+    createSpheresUBO(m_spheres, m_ubo);
 }
 
 
@@ -228,35 +239,28 @@ void resizeCallback(GLFWwindow* window, int width, int height)
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-
     // return to init positon when "R" pressed
     if (key == GLFW_KEY_R && action == GLFW_PRESS) 
     {
        
     }
-
-
 }
 
 
 void charCallback(GLFWwindow* window, unsigned int codepoint)
-{
-}
+{}
 
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
-{
-}
+{}
 
 
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
-{
-}
+{}
 
 
 void cursorPosCallback(GLFWwindow* window, double x, double y)
-{
-}
+{}
 
 
 
@@ -294,7 +298,7 @@ void runGUI()
 int main(int argc, char** argv)
 {
 
-    /* Initialize GLFW and create a window */
+    // Initialize GLFW and create a window
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);//3
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);//2

@@ -15,6 +15,7 @@
 
 
 #include <vector>
+#include <array>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -25,6 +26,70 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#define QT_NO_OPENGL_ES_2
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+
+
+        /*------------------------------------------------------------------------------------------------------------+
+        |                                             GEOMETRY BUFFER                                                 |
+        +------------------------------------------------------------------------------------------------------------*/
+
+const GLuint NB_SPHERES = 9;
+
+// sphere structure
+struct Sphere
+{
+    Sphere(glm::vec3 _center, glm::vec3 _color, float _radius)
+        : center(_center), color(_color), radius(_radius)
+        , pad1(0.0f), pad2(0.0f), pad3(0.0f)
+    {}
+
+    // Add intermediate padding for block alignement
+    // cf. https://learnopengl.com/Advanced-OpenGL/Advanced-GLSL
+    // Must be consistent with struct Sphere defined in compute shader
+    // and allows us to use the std140 layout
+  	glm::vec3 center;
+    float pad1;         
+    glm::vec3 color;
+    float pad2;
+	float radius;
+    glm::vec3 pad3;
+};
+
+
+/*!
+* \fn createSpheresUBO
+* \brief Creates a Uniform Buffer Object to send geometry of the scene to compute shader
+* \param _spheres : geometry of the scene represented as spheres
+* \param _ubo : UBO to be allocated and populated
+* \return populated _ubo
+*/
+inline void createSpheresUBO(std::vector<Sphere>& _spheres, GLuint& _ubo)
+{
+    // 48 bytes per sphere (with intermediate padding)
+    size_t NBytes = sizeof(Sphere);
+
+    // Create and allocate UBO
+    glGenBuffers(1, &_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, _ubo);
+    glBufferData(GL_UNIFORM_BUFFER, NBytes * _spheres.size(), NULL, GL_STATIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+    // Bind UBO to an indexed buffer target
+    // Here using the index 1, which is correspond to uniform ValBlock 
+    // in compute shader (binding = 1)
+    // This way we don't have to use glGetUniformBlockIndex() and glUniformBlockBinding()
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, _ubo); 
+
+    // Populate UBO with spheres
+    glBindBuffer(GL_UNIFORM_BUFFER, _ubo);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, NBytes * _spheres.size(), _spheres.data() ); 
+
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
 
 
 
@@ -39,7 +104,7 @@
 * \param _filename : shader file name
 * \return string containing shader program
 */
-std::string readShaderSource(const std::string& _filename)
+inline std::string readShaderSource(const std::string& _filename)
 {
     std::ifstream file(_filename);
     std::stringstream stream;
@@ -55,7 +120,7 @@ std::string readShaderSource(const std::string& _filename)
 * \brief print out shader info log (i.e. compilation errors)
 * \param _shader : shader
 */
-void showShaderInfoLog(GLuint _shader)
+inline void showShaderInfoLog(GLuint _shader)
 {
     GLint infoLogLength = 0;
     glGetShaderiv(_shader, GL_INFO_LOG_LENGTH, &infoLogLength);
@@ -72,7 +137,7 @@ void showShaderInfoLog(GLuint _shader)
 * \brief print out program info log (i.e. linking errors)
 * \param _program : program
 */
-void showProgramInfoLog(GLuint _program)
+inline void showProgramInfoLog(GLuint _program)
 {
     GLint infoLogLength = 0;
     glGetProgramiv(_program, GL_INFO_LOG_LENGTH, &infoLogLength);
@@ -90,7 +155,7 @@ void showProgramInfoLog(GLuint _program)
 * \param _vertShaderFilename : vertex shader filename
 * \param _fragShaderFilename : fragment shader filename
 */
-GLuint loadShaderProgram(const std::string& _vertShaderFilename, const std::string& _fragShaderFilename, const std::string& _vertHeader="", const std::string& _fragHeader="")
+inline GLuint loadShaderProgram(const std::string& _vertShaderFilename, const std::string& _fragShaderFilename, const std::string& _vertHeader="", const std::string& _fragHeader="")
 {
     // read headers
     std::string vertHeaderSource, fragHeaderSource;
@@ -186,7 +251,7 @@ GLuint loadShaderProgram(const std::string& _vertShaderFilename, const std::stri
 
 
 
-GLuint loadCompShaderProgram(const std::string& _compShaderFilename)
+inline GLuint loadCompShaderProgram(const std::string& _compShaderFilename)
 {
     // create compute shader
     GLuint compShader = glCreateShader(GL_COMPUTE_SHADER);
@@ -246,7 +311,7 @@ GLuint loadCompShaderProgram(const std::string& _compShaderFilename)
 
 
 // Init screen texture
-void buildScreenTex(GLuint *_screenTex, unsigned int _texWidth, unsigned int _texHeight)
+inline void buildScreenTex(GLuint *_screenTex, unsigned int _texWidth, unsigned int _texHeight)
 {
 
     // generate texture
@@ -273,18 +338,20 @@ void buildScreenTex(GLuint *_screenTex, unsigned int _texWidth, unsigned int _te
  * cf. https://learnopengl.com/Advanced-Lighting/SSAO
  */
 
-float lerp(float a, float b, float f)
+inline float lerp(float a, float b, float f)
 {
     return a + f * (b - a);
 }  
 
 // Compute a list of randomly sampled 3D vecors
-std::vector<glm::vec3> buildRandKernel()
+inline void buildRandKernel(std::vector<glm::vec3>& _ssaoKernel)
 {
+    _ssaoKernel.clear(); 
+
     // generate sample kernel 
     std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // random floats between 0.0 and 1.0
     std::default_random_engine generator;
-    std::vector<glm::vec3> ssaoKernel;
+    //std::vector<glm::vec3> ssaoKernel;
 
     int i = 0;
     while(i < 64)//for (unsigned int i = 0; i < 64; ++i)
@@ -301,18 +368,18 @@ std::vector<glm::vec3> buildRandKernel()
             // scale samples s.t. they're more aligned to center of kernel
             scale = lerp(0.1f, 1.0f, scale * scale);
             //sample *= scale;                      // remove artifacts !!!
-            ssaoKernel.push_back(sample);  
+            _ssaoKernel.push_back(sample);  
             i++;
 
         }
     }
 
-    return ssaoKernel;
+    //return ssaoKernel;
 }
 
 
 // build small texture with randomly sampled 2D directions
-void buildKernelRot(GLuint *_noiseTex)
+inline void buildKernelRot(GLuint *_noiseTex)
 {
     std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // random floats between 0.0 and 1.0
     std::default_random_engine generator;
@@ -343,7 +410,7 @@ void buildKernelRot(GLuint *_noiseTex)
         +------------------------------------------------------------------------------------------------------------*/
 
 // Get Work groups info for compute shader
-void checkWorkGroups()
+inline void checkWorkGroups()
 {
     // work group count
     int work_grp_count[3];
