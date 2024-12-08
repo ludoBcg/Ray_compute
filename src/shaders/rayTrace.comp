@@ -35,26 +35,45 @@ uniform float u_lightIntensity;
 uniform sampler2D u_noiseTex;
 uniform vec3 u_samples[64];
 
-// sphere structure
+// Sphere structure
+// Must be consistent with struct Sphere defined in utils.h
 struct Sphere
 {
+	// Contains intermediate padding for block alignement
+    // cf. https://learnopengl.com/Advanced-OpenGL/Advanced-GLSL
   	vec3 center;
-	float radius;
+	float pad1;
 	vec3 color;
+	float pad2;
+	float radius;
+	float pad3;
+	float pad4;
+	float pad5;
 };
+
+// Must be consistent with NB_SPHERES defined in utils.h
+const int NB_SPHERES = 9; 
+
+// Uniform Buffer Object layout
+// Using binding = 1 allows us to read the buffer bound to index 1 (cf createSpheresUBO())
+// Using std140 memory layout requires to add padding values in Sphere struct attributes
+layout (std140, binding = 1) uniform SpheresBlock {
+	Sphere spheres[NB_SPHERES];
+};
+
 
 // Array of spheres which represents geometry (Cornell box)
 // scene center at (0,0,-10), camera at (0,0,0), scene dimensions are (10, 10, 10)
-Sphere spheres[9] = Sphere[9] (	Sphere( vec3( -1e5 - 5,      0.0,      -10.0),  1e5, vec3(0.75, 0.25, 0.25) ) ,		/* Left wall */
-								Sphere( vec3(  1e5 + 5,      0.0,      -10.0),  1e5, vec3(0.25, 0.25, 0.75) ) ,		/* Right wall */
-								Sphere( vec3(      0.0,      0.0,  -1e5 - 15),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Back wall */
-								Sphere( vec3(      0.0,      0.0,  1e5 + 0.1),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Front wall (just behing the camera) */
-								Sphere( vec3(      0.0,  1e5 + 5,      -10.0),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Floor */
-								Sphere( vec3(      0.0, -1e5 - 5,      -10.0),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Ceiling */
-								Sphere( vec3(     -2.5,      3.0,      -12.5),  2.0, vec3(0.95,  0.5, 0.25) ) ,		/* Mirror sphere */
-								Sphere( vec3(      2.5,      3.0,       -8.5),  1.5, vec3(0.95,  0.5, 0.25) ) ,		/* Glass sphere */
-								Sphere( vec3(      0.0,     -4.5,      -10.0), 0.25, vec3( 1.0,  1.0,  1.0) ) 		/* Light source */
-							  );	    
+//Sphere spheres[9] = Sphere[9] (	Sphere( vec3( -1e5 - 5,      0.0,      -10.0),  1e5, vec3(0.75, 0.25, 0.25) ) ,		/* Left wall */
+//								Sphere( vec3(  1e5 + 5,      0.0,      -10.0),  1e5, vec3(0.25, 0.25, 0.75) ) ,		/* Right wall */
+//								Sphere( vec3(      0.0,      0.0,  -1e5 - 15),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Back wall */
+//								Sphere( vec3(      0.0,      0.0,  1e5 + 0.1),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Front wall (just behing the camera) */
+//								Sphere( vec3(      0.0,  1e5 + 5,      -10.0),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Floor */
+//								Sphere( vec3(      0.0, -1e5 - 5,      -10.0),  1e5, vec3(0.75, 0.75, 0.75) ) ,		/* Ceiling */
+//								Sphere( vec3(     -2.5,      3.0,      -12.5),  2.0, vec3(0.95,  0.5, 0.25) ) ,		/* Mirror sphere */
+//								Sphere( vec3(      2.5,      3.0,       -8.5),  1.5, vec3(0.95,  0.5, 0.25) ) ,		/* Glass sphere */
+//								Sphere( vec3(      0.0,     -4.5,      -10.0), 0.25, vec3( 1.0,  1.0,  1.0) ) 		/* Light source */
+//							  );	    
 
 
 // light source position
@@ -410,5 +429,7 @@ void main()
 	// output to a specific pixel in the image
 	imageStore(img_output, pixel_coords, pixel_color / float(u_nbSamples) );
 
+	//pixel_color = vec4(testSpheres[0].color.rgb, 1.0);
+	//imageStore(img_output, pixel_coords, pixel_color );
 
 }
