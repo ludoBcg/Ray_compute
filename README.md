@@ -1,7 +1,9 @@
 # Ray_compute
 A simple path tracing, implemented with GLSL compute shader
 
-Basics: https://antongerdelan.net/opengl/compute.html
+Introduction to OpenGL compute shaders, by Anton Gerdelan: https://antongerdelan.net/opengl/compute.html
+
+C++ path tracer, by Kevin Beason: https://www.kevinbeason.com/smallpt/
 
 
 ## 1. EXTERNAL DEPENDENCIES
