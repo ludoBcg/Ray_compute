@@ -33,6 +33,9 @@ uniform int u_nbBounces;
 uniform float u_lightIntensity;
 
 uniform sampler2D u_noiseTex;
+uniform sampler2D u_perlinR;
+uniform sampler2D u_perlinG;
+uniform sampler2D u_perlinB;
 uniform vec3 u_samples[64];
 
 // Sphere structure
@@ -212,14 +215,19 @@ float hasIntersect(vec3 _rayOrig, vec3 _rayDir, vec3 _sphereCenter, float _spher
 // Direction of reflection is randomly sampled in a hemisphere around surface normal.
 vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cptBounce, int _cptSample)
 {
+
 	// RANDOM ROTATION:
 	
 	// scale factor between noise texture (4x4) and screen image
 	vec2 noiseScale = vec2(float(_dims.x)/ 4.0, float(_dims.y)/ 4.0);
 	// UV coords of the current point in the noise texture 
-	vec2 noiseTexCoords = vec2( float(_pixelCoords.x)/float(_dims.x), float(_pixelCoords.y)/float(_dims.y) ) * noiseScale;
+	vec2 noiseTexCoords = vec2( float(_pixelCoords.x)/float(_dims.x), float(_pixelCoords.y)/float(_dims.y) )/* * noiseScale*/;
 	// read random direction vector from noise texture
-	vec3 randomVec = texture(u_noiseTex, noiseTexCoords).xyz; 
+	//vec3 randomVec = texture(u_noiseTex, noiseTexCoords).xyz; 
+	float randR = texture(u_perlinR, noiseTexCoords).x;
+	float randG = texture(u_perlinG, noiseTexCoords).x; 
+	float randB = texture(u_perlinB, noiseTexCoords).x; 
+	vec3 randomVec = vec3(randR, randG, randB) ; 
 	
 	// If the normal vector is aligned with X or Y axis, the tangent will always be the same, and therefore the TBN matrix as well.
 	// We avoid that by switching randomVec coords in such a case
@@ -246,7 +254,9 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	
 	// 64 randomly sampled vectors (in tangent space) are given in u_samples.
 	// Given the coords of current pixel, we calculate an index in [0;64] to get on of these vectors
-	int index = ( ( _pixelCoords.x + (_dims.y - _pixelCoords.y) ) * _pixelCoords.y + _cptBounce + _cptSample) % 64 ;
+	//int index = ( ( _pixelCoords.x + (_dims.y - _pixelCoords.y) ) * _pixelCoords.y + _cptBounce + _cptSample) % 64 ;
+	float randVal =  ( randR * _cptBounce + randG * _cptSample + randB ) * 64;
+	int index = int(randVal) % 64;
 	// Random vector is multiplied by TBN so its coords are transformed from tangent space to view space.
 	// Camera is at origin, therefore there is no difference between view space and world space.
 	// TBN contains random rotation. The combination of randomly sampled direction and randomly sampled rotation give a pseudo random vector.
