@@ -418,7 +418,7 @@ inline void buildPerlinTex(GLuint& _perlinTex, int _offset)
     {
         for (unsigned int j = 0 + _offset; j < 128 + _offset; j++)
         {
-            float val = glm::perlin(glm::vec2((float)i / 128.0 * 100.0, (float)j / 128.0 * 100.0));
+            float val = glm::perlin(glm::vec2((float)i / 128.0 * 200.0, (float)j / 128.0 * 200.0));
             // change range from [-1;1] to [0;1]
             val = (val + 1.0f) * 0.5f;
 

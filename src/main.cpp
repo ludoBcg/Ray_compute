@@ -294,7 +294,7 @@ void runGUI()
         float frameRate = ImGui::GetIO().Framerate;
         ImGui::Text("FrameRate: %.3f ms/frame (%.1f FPS)", 1000.0f / frameRate, frameRate);
 
-        ImGui::SliderInt("Samples per pixel", &m_nbSamples, 1, 5);
+        ImGui::SliderInt("Samples per pixel", &m_nbSamples, 1, 8);
 
         ImGui::SliderInt("Number of bounces", &m_nbBounces, 1, 5);
 
