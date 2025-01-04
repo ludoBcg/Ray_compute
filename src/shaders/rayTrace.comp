@@ -88,6 +88,23 @@ float eps = 1e-4;
 const float PI = 3.14159265359;
 
 
+// Phong shading
+vec3 phongShading(vec3 _normalVec, vec3 _lightVec, vec3 _halfVec, vec3 _color)
+{
+	// diffuse term
+	float diffFactor = max(0.0, dot(_normalVec, _lightVec));
+	vec3 diffuse = _color * diffFactor;
+	
+	// specular term
+	float specularPower = 128.0;
+    float specFact = pow(max(0.0, dot(_normalVec, _halfVec)), specularPower); // add max to remove black artifacts
+	specFact = min(1.0f, specFact); // make sure max specular specFact is 1
+	vec3 specular = vec3(1.0) * specFact; // specular color is pure white
+	
+	return diffuse;
+}
+
+
 // PBR Lighting -----------------------------------
 
 float DistributionGGX(vec3 _N, vec3 _H, float _a)
@@ -162,6 +179,13 @@ vec3 pbrShading(vec3 _pos, vec3 _normalVec, vec3 _lightVec, vec3 _halfVec, vec3 
 // ------------------------------------------------
 
 
+// pseudo random based on sine sampling:
+// https://thebookofshaders.com/10/
+// http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
+float rand(float _x)
+{
+	return fract( sin(_x) * 43758.5453 );
+}
 
 // Calculate if there is a ray/sphere intersection and return factor t 
 // intesection x = _rayOrig + t * _rayDir
@@ -254,8 +278,7 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	
 	// 64 randomly sampled vectors (in tangent space) are given in u_samples.
 	// Given the coords of current pixel, we calculate an index in [0;64] to get on of these vectors
-	//int index = ( ( _pixelCoords.x + (_dims.y - _pixelCoords.y) ) * _pixelCoords.y + _cptBounce + _cptSample) % 64 ;
-	float randVal =  ( randR * _cptBounce + randG * _cptSample + randB ) * 64;
+	float randVal = rand(randR * _cptSample + randR * _cptBounce) * 64;
 	int index = int(randVal) % 64;
 	// Random vector is multiplied by TBN so its coords are transformed from tangent space to view space.
 	// Camera is at origin, therefore there is no difference between view space and world space.
@@ -263,24 +286,6 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	vec3 sampleVec = TBN * u_samples[index];
 	
 	return normalize(sampleVec);
-}
-							
-
-
-// Phong shading
-vec3 phongShading(vec3 _normalVec, vec3 _lightVec, vec3 _halfVec, vec3 _color)
-{
-	// diffuse term
-	float diffFactor = max(0.0, dot(_normalVec, _lightVec));
-	vec3 diffuse = _color * diffFactor;
-	
-	// specular term
-	float specularPower = 128.0;
-    float specFact = pow(max(0.0, dot(_normalVec, _halfVec)), specularPower); // add max to remove black artifacts
-	specFact = min(1.0f, specFact); // make sure max specular specFact is 1
-	vec3 specular = vec3(1.0) * specFact; // specular color is pure white
-	
-	return diffuse;
 }
 
 
@@ -323,6 +328,7 @@ void main()
 		vec3 normalVec = vec3(0.0);
 		
 		//for each bounce
+		vec3 albedoColorPrev = vec3(1.0,1.0,1.0);
 		bool stop = false;
 		int cptBounce = 0;
 		for(cptBounce = 0; cptBounce < u_nbBounces && !stop; cptBounce++)
@@ -382,6 +388,7 @@ void main()
 							hit = true;
 						}
 					}
+					vec3 directLighting = vec3(0.0, 0.0, 0.0);
 					// compute lighting if hitpoint is not in shadow	
 					if(hit == false)
 					{
@@ -389,12 +396,13 @@ void main()
 						float omega = 2 * 3.14 * (1 - cos_a_max);
 
 						// Add diffusely reflected light from light source; note constant BRDF 1/PI 
-						sample_color.rgb = sample_color.rgb + clamp( albedoColor * (u_lightIntensity * dot(lightVec, normalVec) * omega) * (1.0/3.14), vec3(0.0), vec3(1.0) );
-
-						//sample_color.rgb = sample_color.rgb + phongShading(normalVec, lightVec, halfVec, albedoColor);
-						//sample_color.rgb = sample_color.rgb +  clamp(pbrShading(pos, normalVec, lightVec, halfVec, viewVec, albedoColor), vec3(0.0), vec3(1.0) );
+						directLighting = clamp( albedoColor * (u_lightIntensity * dot(lightVec, normalVec) * omega) * (1.0/3.14), vec3(0.0), vec3(1.0) );
+						//directLighting = phongShading(normalVec, lightVec, halfVec, albedoColor);
+						//directLighting = clamp(pbrShading(pos, normalVec, lightVec, halfVec, viewVec, albedoColor), vec3(0.0), vec3(1.0) );
 					}
-
+					
+					sample_color.rgb = sample_color.rgb + albedoColorPrev * directLighting;
+					albedoColorPrev = albedoColorPrev * albedoColor;
 				}
 				
 			} // end if hit
@@ -483,16 +491,15 @@ void main()
 		} // end for each bounce
 		
 		
-		sample_color = sample_color / float(cptBounce) ;
+		//sample_color = sample_color / float(cptBounce) ;
+		sample_color.rgb = clamp( sample_color.rgb, vec3(0.0), vec3(1.0) );
 		
 		pixel_color = pixel_color + sample_color;
+
 
 	} // end for each sample
 
 	// output to a specific pixel in the image
 	imageStore(img_output, pixel_coords, pixel_color / float(u_nbSamples) );
-
-	//pixel_color = vec4(testSpheres[0].color.rgb, 1.0);
-	//imageStore(img_output, pixel_coords, pixel_color );
 
 }
