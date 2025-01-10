@@ -33,9 +33,7 @@ uniform int u_nbBounces;
 uniform float u_lightIntensity;
 
 uniform sampler2D u_noiseTex;
-uniform sampler2D u_perlinR;
-uniform sampler2D u_perlinG;
-uniform sampler2D u_perlinB;
+uniform sampler2D u_perlinTex;
 uniform vec3 u_samples[64];
 
 // Sphere structure
@@ -82,27 +80,8 @@ layout (std140, binding = 1) uniform SpheresBlock {
 // light source position
 vec3 lightPos = spheres[NB_SPHERES-1].center;
 
-float eps = 1e-4;
-
-
+const float epsilon = 1e-4;
 const float PI = 3.14159265359;
-
-
-// Phong shading
-vec3 phongShading(vec3 _normalVec, vec3 _lightVec, vec3 _halfVec, vec3 _color)
-{
-	// diffuse term
-	float diffFactor = max(0.0, dot(_normalVec, _lightVec));
-	vec3 diffuse = _color * diffFactor;
-	
-	// specular term
-	float specularPower = 128.0;
-    float specFact = pow(max(0.0, dot(_normalVec, _halfVec)), specularPower); // add max to remove black artifacts
-	specFact = min(1.0f, specFact); // make sure max specular specFact is 1
-	vec3 specular = vec3(1.0) * specFact; // specular color is pure white
-	
-	return diffuse;
-}
 
 
 // PBR Lighting -----------------------------------
@@ -219,14 +198,14 @@ float hasIntersect(vec3 _rayOrig, vec3 _rayDir, vec3 _sphereCenter, float _spher
 	// check smaller root first
 	t = b - radicant;
 	// if t > 0
-	if( t > eps) 
+	if( t > epsilon) 
 	{
 		return t;
 	}
 	
 	// check second root
 	t = b + radicant;
-	if( t > eps) 
+	if( t > epsilon) 
 	{
 		return t;
 	}
@@ -248,10 +227,7 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	vec2 noiseTexCoords = vec2( float(_pixelCoords.x)/float(_dims.x), float(_pixelCoords.y)/float(_dims.y) )/* * noiseScale*/;
 	// read random direction vector from noise texture
 	//vec3 randomVec = texture(u_noiseTex, noiseTexCoords).xyz; 
-	float randR = texture(u_perlinR, noiseTexCoords).x;
-	float randG = texture(u_perlinG, noiseTexCoords).x; 
-	float randB = texture(u_perlinB, noiseTexCoords).x; 
-	vec3 randomVec = vec3(randR, randG, randB) ; 
+	vec3 randomVec = texture(u_perlinTex, noiseTexCoords).xyz; 
 	
 	// If the normal vector is aligned with X or Y axis, the tangent will always be the same, and therefore the TBN matrix as well.
 	// We avoid that by switching randomVec coords in such a case
@@ -278,7 +254,7 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	
 	// 64 randomly sampled vectors (in tangent space) are given in u_samples.
 	// Given the coords of current pixel, we calculate an index in [0;64] to get on of these vectors
-	float randVal = rand(randR * _cptSample + randR * _cptBounce) * 64;
+	float randVal = rand(randomVec.x * _cptSample + randomVec.x * _cptBounce) * 64;
 	int index = int(randVal) % 64;
 	// Random vector is multiplied by TBN so its coords are transformed from tangent space to view space.
 	// Camera is at origin, therefore there is no difference between view space and world space.
@@ -397,7 +373,6 @@ void main()
 
 						// Add diffusely reflected light from light source; note constant BRDF 1/PI 
 						directLighting = clamp( albedoColor * (u_lightIntensity * dot(lightVec, normalVec) * omega) * (1.0/3.14), vec3(0.0), vec3(1.0) );
-						//directLighting = phongShading(normalVec, lightVec, halfVec, albedoColor);
 						//directLighting = clamp(pbrShading(pos, normalVec, lightVec, halfVec, viewVec, albedoColor), vec3(0.0), vec3(1.0) );
 					}
 					
@@ -496,10 +471,10 @@ void main()
 		
 		pixel_color = pixel_color + sample_color;
 
-
 	} // end for each sample
 
 	// output to a specific pixel in the image
 	imageStore(img_output, pixel_coords, pixel_color / float(u_nbSamples) );
+
 
 }

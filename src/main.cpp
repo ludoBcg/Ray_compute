@@ -46,9 +46,7 @@ GLuint m_ubo;
 
 // Textures
 GLuint m_screenTex;             /*!< Destination texture for screen-space processing (stores final lighting result) */
-GLuint m_perlinR;
-GLuint m_perlinG;
-GLuint m_perlinB;
+GLuint m_perlinTex;
 
 // shader programs
 GLuint m_programQuad;           /*!< handle of the program object (i.e. shaders) for screen quad rendering */
@@ -120,9 +118,7 @@ void initialize()
 
     buildRandKernel(m_ssaoKernel);
     buildKernelRot(&m_noiseTex);
-    buildPerlinTex(m_perlinR, 0);
-    buildPerlinTex(m_perlinG, 100);
-    buildPerlinTex(m_perlinB, 200);
+    buildPerlinTex(m_perlinTex);
 
     createSpheresUBO(m_spheres, m_ubo);
 }
@@ -178,11 +174,7 @@ void renderRays()
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_noiseTex);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_perlinR);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_perlinG);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, m_perlinB);
+    glBindTexture(GL_TEXTURE_2D, m_perlinTex);
 
     glUniform1i(glGetUniformLocation(m_programRay, "u_screenWidth"), m_winWidth);
     glUniform1i(glGetUniformLocation(m_programRay, "u_screenHeight"), m_winHeight);
@@ -198,9 +190,7 @@ void renderRays()
     }   
 
     glUniform1i(glGetUniformLocation(m_programRay, "u_noiseTex"), 0);
-    glUniform1i(glGetUniformLocation(m_programRay, "u_perlinR"), 1);
-    glUniform1i(glGetUniformLocation(m_programRay, "u_perlinG"), 2);
-    glUniform1i(glGetUniformLocation(m_programRay, "u_perlinB"), 3);
+    glUniform1i(glGetUniformLocation(m_programRay, "u_perlinTex"), 1);
  
 
     // execute compute shader on TEX_WIDTH x TEX_WIDTH x 1 local work groups (i.e., one local work group for each pixel in the image)

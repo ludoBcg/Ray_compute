@@ -407,28 +407,34 @@ inline void buildKernelRot(GLuint *_noiseTex)
 
 
 /*!
-* \fn buildPerlinTex
+* \fn buildPerlinTexRGB
 * \brief Generate pseudo random Perlin noise, to be stored in a texture
 * \param _noiseTex : 2D texture to containing the output random values
 */
-inline void buildPerlinTex(GLuint& _perlinTex, int _offset)
+inline void buildPerlinTex(GLuint& _perlinTex)
 {
-    std::vector<float> noise;
-    for (unsigned int i = 0 + _offset; i < 128 + _offset; i++)
+    std::vector<glm::vec3> noise;
+    for (unsigned int i = 0; i < 128; i++)
     {
-        for (unsigned int j = 0 + _offset; j < 128 + _offset; j++)
+        for (unsigned int j = 0; j < 128; j++)
         {
-            float val = glm::perlin(glm::vec2((float)i / 128.0 * 200.0, (float)j / 128.0 * 200.0));
+            float valR = glm::perlin(glm::vec2((float)i / 128.0 * 100.0, (float)j / 128.0 * 100.0));
             // change range from [-1;1] to [0;1]
-            val = (val + 1.0f) * 0.5f;
+            valR = (valR + 1.0f) * 0.5f;
 
-            noise.push_back( val );
+            float valG = glm::perlin(glm::vec2((float)(i+100) / 128.0 * 100.0, (float)(j+100) / 128.0 * 100.0));
+            valG = (valG + 1.0f) * 0.5f;
+
+            float valB = glm::perlin(glm::vec2((float)(i+200) / 128.0 * 100.0, (float)(j+200) / 128.0 * 100.0));
+            valB = (valB + 1.0f) * 0.5f;
+
+            noise.push_back( glm::vec3(valR, valG, valB) );
         }
     }
 
     glGenTextures(1, &_perlinTex);
     glBindTexture(GL_TEXTURE_2D, _perlinTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 128, 128, 0, GL_RED, GL_FLOAT, &noise[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 128, 128, 0, GL_RGB, GL_FLOAT, &noise[0]);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
