@@ -58,11 +58,6 @@ SET(GLFW_LIBS glfw3.lib)
 include_directories(SYSTEM "${LIBS_DIR}/third_party/glm-1.0.1")
 
 
-# lodepng
-aux_source_directory("${LIBS_DIR}/third_party/lodepng" PROJECT_SRCS)
-include_directories(SYSTEM "${LIBS_DIR}/third_party/lodepng")
-
-
 # ImGui (just add sources to project)
 set(IMGUI_DIR "${LIBS_DIR}/third_party/imgui")
 aux_source_directory("${IMGUI_DIR}" PROJECT_SRCS)
