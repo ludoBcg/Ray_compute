@@ -411,21 +411,21 @@ inline void buildKernelRot(GLuint *_noiseTex)
 * \brief Generate pseudo random Perlin noise, to be stored in a texture
 * \param _noiseTex : 2D texture to containing the output random values
 */
-inline void buildPerlinTex(GLuint& _perlinTex)
+inline void buildPerlinTex(GLuint& _perlinTex, unsigned int _size, float _scale)
 {
     std::vector<glm::vec3> noise;
-    for (unsigned int i = 0; i < 128; i++)
+    for (unsigned int i = 0; i < _size; i++)
     {
-        for (unsigned int j = 0; j < 128; j++)
+        for (unsigned int j = 0; j < _size; j++)
         {
-            float valR = glm::perlin(glm::vec2((float)i / 128.0 * 100.0, (float)j / 128.0 * 100.0));
+            float valR = glm::perlin(glm::vec2((float)i / (float)(_size) * _scale, (float)j / (float)(_size) * _scale));
             // change range from [-1;1] to [0;1]
             valR = (valR + 1.0f) * 0.5f;
 
-            float valG = glm::perlin(glm::vec2((float)(i+100) / 128.0 * 100.0, (float)(j+100) / 128.0 * 100.0));
+            float valG = glm::perlin(glm::vec2((float)(i + _size) / (float)(_size) * _scale, (float)(j + _size) / (float)(_size) * _scale));
             valG = (valG + 1.0f) * 0.5f;
 
-            float valB = glm::perlin(glm::vec2((float)(i+200) / 128.0 * 100.0, (float)(j+200) / 128.0 * 100.0));
+            float valB = glm::perlin(glm::vec2((float)(i + _size*2) / (float)(_size) * _scale, (float)(j + _size*2) / (float)(_size) * _scale));
             valB = (valB + 1.0f) * 0.5f;
 
             noise.push_back( glm::vec3(valR, valG, valB) );
@@ -434,7 +434,7 @@ inline void buildPerlinTex(GLuint& _perlinTex)
 
     glGenTextures(1, &_perlinTex);
     glBindTexture(GL_TEXTURE_2D, _perlinTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 128, 128, 0, GL_RGB, GL_FLOAT, &noise[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _size, _size, 0, GL_RGB, GL_FLOAT, &noise[0]);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);

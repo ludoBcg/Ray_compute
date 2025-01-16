@@ -12,11 +12,6 @@
 #ifndef DRAWABLEMESH_H
 #define DRAWABLEMESH_H
 
-//#define QT_NO_OPENGL_ES_2
-//#include <GL/glew.h>
-
-#include <lodepng.h>
-
 #include <map>
 #include <iostream>
 #include <vector>
@@ -98,15 +93,6 @@ class DrawableMesh
         void drawScreenQuad(GLuint _program, GLuint _tex, bool _isBlurOn, bool _isGaussH = true, int _filterWidth = 0 );
 
 
-        /*!
-        * \fn loadAlbedoTex
-        * \brief load the albedo texture from a file
-        * \param _filename : name of texture image
-        */
-        inline void loadAlbedoTex(const std::string& _filename) { m_albedoTex = load2DTexture(_filename, true); }
-        
-
-
     protected:
 
         /*------------------------------------------------------------------------------------------------------------+
@@ -127,20 +113,6 @@ class DrawableMesh
 
         GLuint m_noiseTex;          /*!< index of noise texture */
         std::vector<glm::vec3> m_ssaoKernel;
-
-
-        /*------------------------------------------------------------------------------------------------------------+
-        |                                               OTHER METHODS                                                 |
-        +-------------------------------------------------------------------------------------------------------------*/
-
-        /*!
-        * \fn load2DTexture
-        * \brief load a 2D image to be used as texture
-        * \param _filename : name of texture image
-        * \param _repeat : repeat (true) or clamptoedge (false)
-        */
-        GLuint load2DTexture(const std::string& _filename, bool _repeat = false);
-
 
 };
 #endif // DRAWABLEMESH_H

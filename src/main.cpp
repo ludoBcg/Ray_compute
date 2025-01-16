@@ -88,8 +88,8 @@ void initialize()
 				  Sphere( glm::vec3(      0.0,      0.0,  1e5 + 0.1), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Front wall (just behing the camera) */
 				  Sphere( glm::vec3(      0.0,  1e5 + 5,      -10.0), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Floor */
 				  Sphere( glm::vec3(      0.0, -1e5 - 5,      -10.0), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Ceiling */
-				  Sphere( glm::vec3(     -2.5,      3.0,      -12.5), glm::vec3(0.95,  0.5, 0.25), 2.0 ) ,	/* Mirror sphere */
-			      Sphere( glm::vec3(      2.5,      3.0,       -8.5), glm::vec3(0.95,  0.5, 0.25), 1.5 ) ,	/* Glass sphere */
+				  Sphere( glm::vec3(     -2.5,      3.0,      -12.5), glm::vec3(0.95, 0.95, 0.95), 2.0 ) ,	/* Mirror sphere */
+			      Sphere( glm::vec3(      2.5,      3.0,       -8.5), glm::vec3(0.95, 0.95, 0.95), 1.5 ) ,	/* Glass sphere */
 				  Sphere( glm::vec3(      0.0,     -4.5,      -10.0), glm::vec3( 1.0,  1.0,  1.0), 0.25 ) 	/* Light source */					 
     };
 
@@ -118,7 +118,7 @@ void initialize()
 
     buildRandKernel(m_ssaoKernel);
     buildKernelRot(&m_noiseTex);
-    buildPerlinTex(m_perlinTex);
+    buildPerlinTex(m_perlinTex, 128, 100.0f);
 
     createSpheresUBO(m_spheres, m_ubo);
 }

@@ -129,37 +129,3 @@ void DrawableMesh::drawScreenQuad(GLuint _program, GLuint _tex, bool _isBlurOn, 
         glUseProgram(0);
 }
 
-
-
-GLuint DrawableMesh::load2DTexture(const std::string& _filename, bool _repeat)
-{
-    std::vector<unsigned char> data;
-    unsigned width, height;
-    unsigned error = lodepng::decode(data, width, height, _filename);
-    if (error != 0) 
-    {
-        std::cerr << "[ERROR] DrawableMesh::load2DTexture(): " << lodepng_error_text(error) << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    if(!_repeat)
-    {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-    else
-    {
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );  
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT ); 
-    }
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &(data[0]));
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    return texture;
-}
-
