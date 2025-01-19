@@ -17,11 +17,11 @@
 namespace pathTracing
 {
     // Thin lens parameters
-    const double aperture = 2.0;       // radius of lens (no depth of field if set to zero) 
+    const double aperture = 0.0;       // radius of lens (no depth of field if set to zero) 
     const double focal_depth = 65.0;   // distance between center of lens anf focal plane
 
     // Scene geometry to render (spheres or triangles)
-    const bool useTriangles = true;
+    const bool useTriangles = false;
 
     // Path Tracing parameters
     const unsigned int maxDepth = 5;
@@ -255,70 +255,76 @@ namespace pathTracing
                 col.MultComponents(Radiance(Ray(hitpoint, _ray.dir - normal * 2 * normal.Dot(_ray.dir)),
                     _depth, 1));
         }
-
-        // Otherwise object transparent, i.e. assumed dielectric glass material
-        Ray reflRay(hitpoint, _ray.dir - normal * 2 * normal.Dot(_ray.dir));  // Prefect reflection
-        bool into = normal.Dot(nl) > 0;       // Bool for checking if ray from outside going in
-        double nc = 1.0;                      // Index of refraction of air (approximately)
-        double nt = 1.5;                      // Index of refraction of glass (approximately)
-        double nnt = 0.0;
-
-        // Set ratio depending on hit from inside or outside
-        if (into)
-            nnt = nc / nt;
-        else
-            nnt = nt / nc;
-
-        double ddn = _ray.dir.Dot(nl);
-        double cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
-
-        // Check for total internal reflection, if so only reflect
-        if (cos2t <= 0.0)
+        else if (obj.refl == REFR)
         {
-            // move reflection ray origin to the sphere surface
-            Ray reflRay2(hitpoint + normal * dynamic_cast<Sphere&>(spheres.at(id)).radius, 
-                         _ray.dir - normal * 2 * normal.Dot(_ray.dir));
-            return obj.emission + col.MultComponents(Radiance(reflRay2, _depth, 1));
-        }
+            // Otherwise object transparent, i.e. assumed dielectric glass material
+            Ray reflRay(hitpoint, _ray.dir - normal * 2 * normal.Dot(_ray.dir));  // Prefect reflection
+            bool into = normal.Dot(nl) > 0;       // Bool for checking if ray from outside going in
+            double nc = 1.0;                      // Index of refraction of air (approximately)
+            double nt = 1.5;                      // Index of refraction of glass (approximately)
+            double nnt = 0.0;
 
-        // Otherwise reflection and/or refraction occurs
-        Vector tdir;
-
-        // Determine transmitted ray direction for refraction
-        if (into)
-            tdir = (_ray.dir * nnt - normal * (ddn * nnt + sqrt(cos2t))).Normalized();
-        else
-            tdir = (_ray.dir * nnt + normal * (ddn * nnt + sqrt(cos2t))).Normalized();
-
-        // Determine R0 for Schlick큦 approximation
-        double a = nt - nc;
-        double b = nt + nc;
-        double R0 = a * a / (b * b);
-
-        // Cosine of correct angle depending on outside/inside
-        double c;
-        if (into)
-            c = 1 + ddn;
-        else
-            c = 1 - tdir.Dot(normal);
-
-        // Compute Schlick큦 approximation of Fresnel equation
-        double Re = R0 + (1 - R0) * c * c * c * c * c;   // Reflectance
-        double Tr = 1 - Re;                              // Transmittance
-
-        // Probability for selecting reflectance or transmittance
-        double P = .25 + .5 * Re;
-        double RP = Re / P;         // Scaling factors for unbiased estimator
-        double TP = Tr / (1 - P);
-
-        if (_depth < 3)   // Initially both reflection and transmission
-            return obj.emission + col.MultComponents(Radiance(reflRay, _depth, 1) * Re +
-                Radiance(Ray(hitpoint, tdir), _depth, 1) * Tr);
-        else             // Russian Roulette
-            if (normRand() < P)
-                return obj.emission + col.MultComponents(Radiance(reflRay, _depth, 1) * RP);
+            // Set ratio depending on hit from inside or outside
+            if (into)
+                nnt = nc / nt;
             else
-                return obj.emission + col.MultComponents(Radiance(Ray(hitpoint, tdir), _depth, 1) * TP);
+                nnt = nt / nc;
+
+            double ddn = _ray.dir.Dot(nl);
+            double cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
+
+            // Check for total internal reflection, if so only reflect
+            if (cos2t <= 0.0)
+            {
+                // move reflection ray origin to the sphere surface
+                Ray reflRay2(hitpoint + normal * dynamic_cast<Sphere&>(spheres.at(id)).radius,
+                    _ray.dir - normal * 2 * normal.Dot(_ray.dir));
+                return obj.emission + col.MultComponents(Radiance(reflRay2, _depth, 1));
+            }
+
+            // Otherwise reflection and/or refraction occurs
+            Vector tdir;
+
+            // Determine transmitted ray direction for refraction
+            if (into)
+                tdir = (_ray.dir * nnt - normal * (ddn * nnt + sqrt(cos2t))).Normalized();
+            else
+                tdir = (_ray.dir * nnt + normal * (ddn * nnt + sqrt(cos2t))).Normalized();
+
+            // Determine R0 for Schlick큦 approximation
+            double a = nt - nc;
+            double b = nt + nc;
+            double R0 = a * a / (b * b);
+
+            // Cosine of correct angle depending on outside/inside
+            double c;
+            if (into)
+                c = 1 + ddn;
+            else
+                c = 1 - tdir.Dot(normal);
+
+            // Compute Schlick큦 approximation of Fresnel equation
+            double Re = R0 + (1 - R0) * c * c * c * c * c;   // Reflectance
+            double Tr = 1 - Re;                              // Transmittance
+
+            // Probability for selecting reflectance or transmittance
+            double P = .25 + .5 * Re;
+            double RP = Re / P;         // Scaling factors for unbiased estimator
+            double TP = Tr / (1 - P);
+
+            if (_depth < 3)   // Initially both reflection and transmission
+                return obj.emission + col.MultComponents(Radiance(reflRay, _depth, 1) * Re +
+                    Radiance(Ray(hitpoint, tdir), _depth, 1) * Tr);
+            else             // Russian Roulette
+                if (normRand() < P)
+                    return obj.emission + col.MultComponents(Radiance(reflRay, _depth, 1) * RP);
+                else
+                    return obj.emission + col.MultComponents(Radiance(Ray(hitpoint, tdir), _depth, 1) * TP);
+        }
+        else
+        {
+            std::cerr << "invalid material ! " << std::endl;
+        }
     }
 
 
@@ -413,14 +419,14 @@ namespace pathTracing
 int main(int argc, char* argv[])
 {
     // Image to store final rendering
-    const unsigned int width = 1024;
-    const unsigned int height = 768;
+    const unsigned int width = /*1024*/512;
+    const unsigned int height = /*768*/512;
     pathTracing::Image img(width, height);
 
     // Performs path tracing
     pathTracing::Render(img);
 
     // save image output
-    img.Save(std::string("result.ppm"));
+    img.Save(std::string("result_spheres.ppm"));
 
 }

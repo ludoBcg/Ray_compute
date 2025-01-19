@@ -17,7 +17,7 @@
 
 
 // size of the local work group = 1 x 1 (i.e., one pixel. 2D only, could be 3D)
-layout(local_size_x = 1/*, local_size_y = 1*/) in;
+layout(local_size_x = 1, local_size_y = 1) in;
 
 // image2D input
 // declared as GL_RGBA8 (UNSIGNED_BYTE) in c++ code -> rgba8 in compute shader 
@@ -32,7 +32,6 @@ uniform int u_nbSamples;
 uniform int u_nbBounces;
 uniform float u_lightIntensity;
 
-uniform sampler2D u_noiseTex;
 uniform sampler2D u_perlinTex;
 uniform vec3 u_samples[64];
 
@@ -164,14 +163,11 @@ float hasIntersect(vec3 _rayOrig, vec3 _rayDir, vec3 _sphereCenter, float _spher
 vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cptBounce, int _cptSample)
 {
 
-	// RANDOM ROTATION:
+	// RANDOM DIRECTION:
 	
-	// scale factor between noise texture (4x4) and screen image
-	vec2 noiseScale = vec2(float(_dims.x)/ 4.0, float(_dims.y)/ 4.0);
 	// UV coords of the current point in the noise texture 
-	vec2 noiseTexCoords = vec2( float(_pixelCoords.x)/float(_dims.x), float(_pixelCoords.y)/float(_dims.y) )/* * noiseScale*/;
+	vec2 noiseTexCoords = vec2( float(_pixelCoords.x)/float(_dims.x), float(_pixelCoords.y)/float(_dims.y) );
 	// read random direction vector from noise texture
-	//vec3 randomVec = texture(u_noiseTex, noiseTexCoords).xyz; 
 	vec3 randomVec = texture(u_perlinTex, noiseTexCoords).xyz; 
 	
 	// If the normal vector is aligned with X or Y axis, the tangent will always be the same, and therefore the TBN matrix as well.
@@ -195,7 +191,7 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	vec3 bitangent = cross(_normalVec, tangent);
 	mat3 TBN = mat3(tangent, bitangent, _normalVec); 
 	
-	// RANDOM DIRECTION:
+	// RANDOM ROTATION:
 	
 	// 64 randomly sampled vectors (in tangent space) are given in u_samples.
 	// Given the coords of current pixel, we calculate an index in [0;64] to get on of these vectors
@@ -403,7 +399,8 @@ void main()
 			}
 			else
 			{
-				// Lambertian material (uniform reflection in all direction, simulated by average of several random reflections (Monte-Carlo)
+				// Lambertian material: uniform reflection in all directions, 
+				// simulated by average of several random reflections (Monte-Carlo)
 				ray_dir = randomReflection(normalVec, dims, pixel_coords, cptBounce, cptSample);
 			}
 
@@ -411,8 +408,6 @@ void main()
 			
 		} // end for each bounce
 		
-		
-		//sample_color = sample_color / float(cptBounce) ;
 		sample_color.rgb = clamp( sample_color.rgb, vec3(0.0), vec3(1.0) );
 		
 		pixel_color = pixel_color + sample_color;

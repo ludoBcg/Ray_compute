@@ -26,8 +26,8 @@
 
 // Window
 GLFWwindow *m_window;               /*!<  GLFW window */
-int m_winWidth = 1024;              /*!<  window width (XGA) */
-int m_winHeight = 720;              /*!<  window height (XGA) */
+int m_winWidth = 800;               /*!<  window width */
+int m_winHeight = 600;              /*!<  window height */
 const unsigned int TEX_WIDTH = 512, TEX_HEIGHT = 512  ; /*!< textures dimensions  */
 
 int m_nbSamples = 1;                /*!<  number of samples per pixel */
@@ -52,9 +52,9 @@ GLuint m_perlinTex;
 GLuint m_programQuad;           /*!< handle of the program object (i.e. shaders) for screen quad rendering */
 GLuint m_programRay;            /*!< compute shader for ray tracing*/
 
+glm::ivec3 m_maxWorkGroupCount; /*!< work group count */
 
-std::vector<glm::vec3> m_ssaoKernel;
-GLuint m_noiseTex;          
+std::vector<glm::vec3> m_ssaoKernel;      
 
 std::string shaderDir = "../../src/shaders/";   /*!< relative path to shaders folder  */
 std::string modelDir = "../../models/";   /*!< relative path to meshes and textures files folder  */
@@ -88,8 +88,8 @@ void initialize()
 				  Sphere( glm::vec3(      0.0,      0.0,  1e5 + 0.1), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Front wall (just behing the camera) */
 				  Sphere( glm::vec3(      0.0,  1e5 + 5,      -10.0), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Floor */
 				  Sphere( glm::vec3(      0.0, -1e5 - 5,      -10.0), glm::vec3(0.75, 0.75, 0.75), 1e5 ) ,	/* Ceiling */
-				  Sphere( glm::vec3(     -2.5,      3.0,      -12.5), glm::vec3(0.95, 0.95, 0.95), 2.0 ) ,	/* Mirror sphere */
-			      Sphere( glm::vec3(      2.5,      3.0,       -8.5), glm::vec3(0.95, 0.95, 0.95), 1.5 ) ,	/* Glass sphere */
+				  Sphere( glm::vec3(     -2.5,      3.0,      -12.5), glm::vec3(0.99, 0.99, 0.99), 2.0 ) ,	/* Mirror sphere */
+			      Sphere( glm::vec3(      2.5,      3.0,       -8.5), glm::vec3(0.99, 0.99, 0.99), 1.5 ) ,	/* Glass sphere */
 				  Sphere( glm::vec3(      0.0,     -4.5,      -10.0), glm::vec3( 1.0,  1.0,  1.0), 0.25 ) 	/* Light source */					 
     };
 
@@ -106,19 +106,16 @@ void initialize()
     m_drawQuad = std::make_unique<DrawableMesh>();
     m_drawQuad->createQuadVAO();
 
-    //m_drawQuad->loadAlbedoTex( modelDir + "UVchecker.png" );
-
     // init screen texture
     buildScreenTex(&m_screenTex, TEX_WIDTH, TEX_HEIGHT);
 
-    checkWorkGroups();
+    checkWorkGroups(m_maxWorkGroupCount);
 
     m_programQuad = loadShaderProgram(shaderDir + "quadTex.vert", shaderDir + "quadTex.frag");
     m_programRay = loadCompShaderProgram(shaderDir + "rayTrace.comp");
 
     buildRandKernel(m_ssaoKernel);
-    buildKernelRot(&m_noiseTex);
-    buildPerlinTex(m_perlinTex, 128, 100.0f);
+    buildPerlinTex(m_perlinTex, TEX_WIDTH, TEX_HEIGHT, 100.0f);
 
     createSpheresUBO(m_spheres, m_ubo);
 }
@@ -172,8 +169,6 @@ void renderRays()
 
     // bind textures
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_noiseTex);
-    glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, m_perlinTex);
 
     glUniform1i(glGetUniformLocation(m_programRay, "u_screenWidth"), m_winWidth);
@@ -189,12 +184,12 @@ void renderRays()
         glUniform3fv(glGetUniformLocation(m_programRay, str.c_str()), 1, &myVec[0]);
     }   
 
-    glUniform1i(glGetUniformLocation(m_programRay, "u_noiseTex"), 0);
-    glUniform1i(glGetUniformLocation(m_programRay, "u_perlinTex"), 1);
+    glUniform1i(glGetUniformLocation(m_programRay, "u_perlinTex"), 0);
  
 
-    // execute compute shader on TEX_WIDTH x TEX_WIDTH x 1 local work groups (i.e., one local work group for each pixel in the image)
-    glDispatchCompute((GLuint)TEX_WIDTH, (GLuint)TEX_WIDTH, 1);
+    // execute compute shader on TEX_WIDTH x TEX_WIDTH x 1 global work groups (i.e., one work group for each pixel in the image)
+    assert(TEX_WIDTH <= m_maxWorkGroupCount.x && TEX_HEIGHT <= m_maxWorkGroupCount.y);
+    glDispatchCompute((GLuint)TEX_WIDTH, (GLuint)TEX_HEIGHT, 1);
 
   
     // make sure writing to image has finished before read

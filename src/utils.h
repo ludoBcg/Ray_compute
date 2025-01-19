@@ -379,53 +379,29 @@ inline void buildRandKernel(std::vector<glm::vec3>& _ssaoKernel)
 }
 
 
-// build small texture with randomly sampled 2D directions
-inline void buildKernelRot(GLuint *_noiseTex)
-{
-    std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // random floats between 0.0 and 1.0
-    std::default_random_engine generator;
-
-    //create a 4x4 array of random rotation vectors oriented around the tangent-space surface normal
-    std::vector<glm::vec3> ssaoNoise;
-    for (unsigned int i = 0; i < 16; i++)
-    {
-        glm::vec3 noise( randomFloats(generator) * 2.0 - 1.0, 
-                         randomFloats(generator) * 2.0 - 1.0, 
-                         0.0f ); 
-
-        ssaoNoise.push_back(noise);
-    } 
-
-    glGenTextures(1, _noiseTex);
-    glBindTexture(GL_TEXTURE_2D, *_noiseTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);  
-}
-
-
 /*!
 * \fn buildPerlinTexRGB
 * \brief Generate pseudo random Perlin noise, to be stored in a texture
 * \param _noiseTex : 2D texture to containing the output random values
 */
-inline void buildPerlinTex(GLuint& _perlinTex, unsigned int _size, float _scale)
+inline void buildPerlinTex(GLuint& _perlinTex, unsigned int _texWidth, unsigned int _texHeight, float _scale)
 {
     std::vector<glm::vec3> noise;
-    for (unsigned int i = 0; i < _size; i++)
+    for (unsigned int i = 0; i < _texWidth; i++)
     {
-        for (unsigned int j = 0; j < _size; j++)
+        for (unsigned int j = 0; j < _texHeight; j++)
         {
-            float valR = glm::perlin(glm::vec2((float)i / (float)(_size) * _scale, (float)j / (float)(_size) * _scale));
+            // sample R values
+            float valR = glm::perlin(glm::vec2((float)i / (float)(_texWidth) * _scale, (float)j / (float)(_texHeight) * _scale));
             // change range from [-1;1] to [0;1]
             valR = (valR + 1.0f) * 0.5f;
 
-            float valG = glm::perlin(glm::vec2((float)(i + _size) / (float)(_size) * _scale, (float)(j + _size) / (float)(_size) * _scale));
+            // sample G values (add offset to avoid same values as R)
+            float valG = glm::perlin(glm::vec2((float)(i + _texWidth) / (float)(_texWidth) * _scale, (float)(j + _texHeight) / (float)(_texHeight) * _scale));
             valG = (valG + 1.0f) * 0.5f;
 
-            float valB = glm::perlin(glm::vec2((float)(i + _size*2) / (float)(_size) * _scale, (float)(j + _size*2) / (float)(_size) * _scale));
+            // sample B values (add offset to avoid same values as R and G)
+            float valB = glm::perlin(glm::vec2((float)(i + _texWidth*2) / (float)(_texWidth) * _scale, (float)(j + _texHeight*2) / (float)(_texHeight) * _scale));
             valB = (valB + 1.0f) * 0.5f;
 
             noise.push_back( glm::vec3(valR, valG, valB) );
@@ -434,7 +410,7 @@ inline void buildPerlinTex(GLuint& _perlinTex, unsigned int _size, float _scale)
 
     glGenTextures(1, &_perlinTex);
     glBindTexture(GL_TEXTURE_2D, _perlinTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _size, _size, 0, GL_RGB, GL_FLOAT, &noise[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _texWidth, _texHeight, 0, GL_RGB, GL_FLOAT, &noise[0]);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -447,16 +423,14 @@ inline void buildPerlinTex(GLuint& _perlinTex, unsigned int _size, float _scale)
         +------------------------------------------------------------------------------------------------------------*/
 
 // Get Work groups info for compute shader
-inline void checkWorkGroups()
+inline void checkWorkGroups(glm::ivec3& _maxWorkGroupCount)
 {
     // work group count
-    int work_grp_count[3];
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &_maxWorkGroupCount[0]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &_maxWorkGroupCount[1]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &_maxWorkGroupCount[2]);
 
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_count[0]);
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &work_grp_count[1]);
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &work_grp_count[2]);
-
-    std::cout << "max global (total) work group counts x: " << work_grp_count[0] << "  y: " <<  work_grp_count[1] << "  z: " <<  work_grp_count[2] << std::endl;
+    std::cout << "max global (total) work group counts x: " << _maxWorkGroupCount[0] << "  y: " <<  _maxWorkGroupCount[1] << "  z: " <<  _maxWorkGroupCount[2] << std::endl;
 
 
     // work group size
