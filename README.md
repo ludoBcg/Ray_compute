@@ -1,12 +1,16 @@
 # Ray_compute
 A simple path tracing, implemented with GLSL compute shader
 
+![raycompute_result](raycompute_result.png)
+
+## 1. SOURCES
+
 Introduction to OpenGL compute shaders, by Anton Gerdelan: https://antongerdelan.net/opengl/compute.html
 
 C++ path tracer, by Kevin Beason: https://www.kevinbeason.com/smallpt/
 
 
-## 1. EXTERNAL DEPENDENCIES
+## 2. EXTERNAL DEPENDENCIES
 
 All libraries are provided in the [libs](https://github.com/ludoBcg/libs) repository. 
 
