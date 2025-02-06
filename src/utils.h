@@ -333,6 +333,17 @@ inline void buildScreenTex(GLuint *_screenTex, unsigned int _texWidth, unsigned 
 }
 
 
+// Clear screen texture
+inline void clearScreenTex(GLuint *_screenTex, unsigned int _texWidth, unsigned int _texHeight, std::vector<unsigned char>& _zeroBuffer)
+{
+    // bind texture
+    glBindTexture(GL_TEXTURE_2D, *_screenTex);
+    
+    // update a sub part of the image (in this case the entire image) with buffer content (here a zero buffer)
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _texWidth, _texHeight, GL_RGBA, GL_UNSIGNED_BYTE, &_zeroBuffer.at(0));
+
+}
+
 
 
 /*
@@ -352,7 +363,6 @@ inline void buildRandKernel(std::vector<glm::vec3>& _ssaoKernel)
     // generate sample kernel 
     std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // random floats between 0.0 and 1.0
     std::default_random_engine generator;
-    //std::vector<glm::vec3> ssaoKernel;
 
     int i = 0;
     while(i < 64)//for (unsigned int i = 0; i < 64; ++i)
@@ -374,8 +384,6 @@ inline void buildRandKernel(std::vector<glm::vec3>& _ssaoKernel)
 
         }
     }
-
-    //return ssaoKernel;
 }
 
 

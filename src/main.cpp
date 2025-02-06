@@ -54,7 +54,11 @@ GLuint m_programRay;            /*!< compute shader for ray tracing*/
 
 glm::ivec3 m_maxWorkGroupCount; /*!< work group count */
 
-std::vector<glm::vec3> m_ssaoKernel;      
+std::vector<glm::vec3> m_ssaoKernel;  
+
+
+std::vector<unsigned char> m_zeroBuffer; /*!< zero buffer used to clear screen texture */
+
 
 std::string shaderDir = "../../src/shaders/";   /*!< relative path to shaders folder  */
 std::string modelDir = "../../models/";   /*!< relative path to meshes and textures files folder  */
@@ -108,6 +112,7 @@ void initialize()
 
     // init screen texture
     buildScreenTex(&m_screenTex, TEX_WIDTH, TEX_HEIGHT);
+    m_zeroBuffer.assign(TEX_WIDTH * TEX_HEIGHT * 4, 0);
 
     checkWorkGroups(m_maxWorkGroupCount);
 
@@ -153,19 +158,20 @@ void update()
 
 void renderRays()
 {
+    // clear screen texture content
+    clearScreenTex(&m_screenTex, TEX_WIDTH, TEX_HEIGHT, m_zeroBuffer);
+
 
     // use compute shader
     glUseProgram(m_programRay);
-
-
 
     // glBindImageTexture() bind an image and send it as unifnorm layout to shader
     // It replaces glActiveTexture() + glBindTexture() + glUniform1i() used for texture uniforms
     //
     // GL_RGBA8 (UNSIGNED_BYTE) -> declared as rgba8 in compute shader 
     // https://www.khronos.org/opengl/wiki/Image_Load_Store#Format_qualifiers
-    // GL_WRITE_ONLY as we only writeinto the image
-    glBindImageTexture(0, m_screenTex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    // use GL_READ_WRITE as we read the content of the image and then overwrite it
+    glBindImageTexture(0, m_screenTex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
 
     // bind textures
     glActiveTexture(GL_TEXTURE0);
@@ -182,20 +188,23 @@ void renderRays()
         std::string str = "u_samples[" + std::to_string(i) + "]";
         glm::vec3 myVec = m_ssaoKernel[i];
         glUniform3fv(glGetUniformLocation(m_programRay, str.c_str()), 1, &myVec[0]);
-    }   
+    }
 
     glUniform1i(glGetUniformLocation(m_programRay, "u_perlinTex"), 0);
- 
 
-    // execute compute shader on TEX_WIDTH x TEX_WIDTH x 1 global work groups (i.e., one work group for each pixel in the image)
-    assert(TEX_WIDTH <= m_maxWorkGroupCount.x && TEX_HEIGHT <= m_maxWorkGroupCount.y);
-    glDispatchCompute((GLuint)TEX_WIDTH, (GLuint)TEX_HEIGHT, 1);
+    // call compute shader for each sample, and add result into screen texture
+    for(int cptSample = 0; cptSample < m_nbSamples; cptSample++)
+    {
+        glUniform1i(glGetUniformLocation(m_programRay, "u_cptSample"), cptSample);
 
-  
-    // make sure writing to image has finished before read
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        // execute compute shader on TEX_WIDTH x TEX_WIDTH x 1 global work groups (i.e., one work group for each pixel in the image)
+        assert(TEX_WIDTH <= m_maxWorkGroupCount.x && TEX_HEIGHT <= m_maxWorkGroupCount.y);
+        glDispatchCompute((GLuint)TEX_WIDTH, (GLuint)TEX_HEIGHT, 1);
 
+        // make sure writing to image has finished before read
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
+    }
 }
 
 void displayScreen()
