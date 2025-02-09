@@ -23,5 +23,3 @@ External dependencies used for this project are:
 * [GLFW (Graphics Library Framework)](https://www.glfw.org/)
 
 * [Dear ImGui (Immediate-mode Graphical User Interface)](https://github.com/ocornut/imgui)
-
-* [LodePNG](https://lodev.org/lodepng/)  
