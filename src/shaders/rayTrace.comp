@@ -167,7 +167,7 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	// RANDOM DIRECTION:
 	
 	// UV coords of the current point in the noise texture 
-	vec2 noiseTexCoords = vec2( float(_pixelCoords.x)/float(_dims.x), float(_pixelCoords.y)/float(_dims.y) );
+	vec2 noiseTexCoords = vec2( float(_pixelCoords.x + u_cptSample)/float(_dims.x), float(_pixelCoords.y + _cptBounce)/float(_dims.y) );
 	// read random direction vector from noise texture
 	vec3 randomVec = texture(u_perlinTex, noiseTexCoords).xyz; 
 	
@@ -196,7 +196,7 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	
 	// 64 randomly sampled vectors (in tangent space) are given in u_samples.
 	// Given the coords of current pixel, we calculate an index in [0;64] to get on of these vectors
-	float randVal = rand(randomVec.x * u_cptSample + randomVec.x * _cptBounce) * 64;
+	float randVal = rand(randomVec.x * u_cptSample + randomVec.y * _cptBounce) * 64;
 	int index = int(randVal) % 64;
 	// Random vector is multiplied by TBN so its coords are transformed from tangent space to view space.
 	// Camera is at origin, therefore there is no difference between view space and world space.
@@ -205,6 +205,20 @@ vec3 randomReflection(vec3 _normalVec, ivec2 _dims, ivec2 _pixelCoords, int _cpt
 	
 	return normalize(sampleVec);
 }
+
+// Calculate a perfect, mirror-like, reflection vector.
+vec3 perfectReflection(vec3 _rayDir, vec3 _normalVec)
+{
+	// cf. http://paulbourke.net/geometry/reflected/
+	return normalize(_rayDir - _normalVec * 2 * dot(_normalVec, _rayDir));
+}
+
+// Calculate refraction vector.
+vec3 refraction(vec3 _rayDir, vec3 _normalVec, float _nnt, float _ddn, float _cos2t)
+{
+	return normalize(_rayDir * _nnt + _normalVec * (_ddn * _nnt + sqrt(_cos2t)));
+}
+
 
 
 void main() 
@@ -234,7 +248,7 @@ void main()
 	// init sample color to black
 	vec4 sample_color = vec4(0.0, 0.0, 0.0, 1.0);
 
-	// compute current sample (the shader is executed one time for each sample)
+	// compute current sample color (the shader is executed one time for each sample)
 	{	
 		// define ray (origin and direction ) for each pixel
 		vec3 ray_orig = vec3(x * max_x, y * max_y, 0.0);
@@ -247,8 +261,7 @@ void main()
 		//for each bounce
 		vec3 albedoColorPrev = vec3(1.0,1.0,1.0);
 		bool stop = false;
-		int cptBounce = 0;
-		for(cptBounce = 0; cptBounce < u_nbBounces && !stop; cptBounce++)
+		for(int cptBounce = 0; cptBounce < u_nbBounces && !stop; cptBounce++)
 		{
 			
 			float minT = 1e20;
@@ -271,11 +284,12 @@ void main()
 			// if a sphere was hit
 			if(idSphere != -1)
 			{
+				// If the sphere is the light source
 				if(idSphere == spheres.length()-1)
 				{
 					sample_color.rgb = vec3(1.0);
 
-					// stop now if we hit the light source
+					// stop now
 					stop = true;
 				}
 				else
@@ -294,14 +308,15 @@ void main()
 					// half vector
 					vec3 halfVec = normalize(lightVec + viewVec);
 					
-					// shoot shadow ray between hitpoint and light source
 					float tShadow = 0.0;
 					bool hit = false;
 					// for each sphere (except light bulb !)
 					for(int j = 0; j<spheres.length()-1; j++)
 					{
+						// shoot shadow ray between hitpoint and light source
 						tShadow = hasIntersect(pos + 0.015*normalVec, normalize(vec3(lightPos - pos)), spheres[j].center, spheres[j].radius);
 						
+						// test if shadow ray intersect another sphere before reaching light source
 						if(tShadow != 0.0 && tShadow < length(lightPos - pos) )
 						{
 							hit = true;
@@ -334,17 +349,17 @@ void main()
 			// origin is hitpoint ( add normal offset to avoid shadow acnee)
 			ray_orig = pos + 0.015 * normalVec;
 			
-			
-			
 			if(idSphere == spheres.length()-3)
 			{
 				// If the hitpoint belongs to mirror sphere:
+
 				// perfect reflection (mirror-like)
-				// http://paulbourke.net/geometry/reflected/
-				ray_dir = normalize( ray_dir - normalVec * 2 * dot(normalVec , ray_dir) );
+				ray_dir = perfectReflection(ray_dir, normalVec);
 			}
 			else if(idSphere == spheres.length()-2)
 			{
+				// If the hitpoint belongs to transparent sphere:
+
 				vec3 normalInit = normalVec;
 				bool isEntering = true;
 				if (dot(normalVec, ray_dir) >= 0.0)
@@ -353,18 +368,15 @@ void main()
 					normalVec = -1.0 * normalVec;
 					isEntering = false;
 				}
-					
-					
-				// If the hitpoint belongs to transparent sphere:
-				// 1. reflection (mirror-like)
-				vec3 reflec = normalize( ray_dir - normalInit * 2 * dot(normalInit , ray_dir) );
-				// 2. refraction:
-				float nc = 1.0;                        // Index of refraction of air (approximately)
-				float nt = 1.5;                      // Index of refraction of glass (approximately)
-				float nnt;
 
-				if(isEntering)      // Set ratio depending on hit from inside or outside 
-					nnt = nc/nt;
+				// 1. reflection (mirror-like)
+				vec3 reflec = perfectReflection(ray_dir, normalInit);
+				// 2. refraction:
+				float nc = 1.0;           // Index of refraction of air (approximately)
+				float nt = 1.5;           // Index of refraction of glass (approximately)
+				float nnt;
+				if(isEntering)
+					nnt = nc/nt; // Ratio depending on hit from inside or outside
 				else
 					nnt = nt/nc;
 
@@ -385,13 +397,15 @@ void main()
 					if(isEntering)
 					{
 						ray_orig = pos - 0.015 * normalInit;
-						tdir = normalize(ray_dir * nnt - normalInit * (ddn * nnt + sqrt(cos2t)));
+						//tdir = normalize(ray_dir * nnt - normalInit * (ddn * nnt + sqrt(cos2t)));
+						tdir = refraction(ray_dir, -normalInit, nnt, ddn, cos2t);
 						
 					}
 					else
 					{
 						ray_orig = pos + 0.015 * normalInit;
-						tdir = normalize(ray_dir * nnt + normalInit * (ddn * nnt + sqrt(cos2t)));
+						//tdir = normalize(ray_dir * nnt + normalInit * (ddn * nnt + sqrt(cos2t)));
+						tdir = refraction(ray_dir, normalInit, nnt, ddn, cos2t);
 					}
 					
 					ray_dir = tdir;
@@ -399,7 +413,9 @@ void main()
 			}
 			else
 			{
-				// Lambertian material: uniform reflection in all directions, 
+				// If the hitpoint belongs to a Lambertian sphere:
+
+				// Uniform reflection in all directions, 
 				// simulated by average of several random reflections (Monte-Carlo)
 				ray_dir = randomReflection(normalVec, dims, pixel_coords, cptBounce);
 			}
