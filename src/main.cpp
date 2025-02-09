@@ -30,19 +30,17 @@ int m_winWidth = 800;               /*!<  window width */
 int m_winHeight = 600;              /*!<  window height */
 const unsigned int TEX_WIDTH = 512, TEX_HEIGHT = 512  ; /*!< textures dimensions  */
 
+// Path tracing parameters
 int m_nbSamples = 1;                /*!<  number of samples per pixel */
 int m_nbBounces = 2;                /*!<  number of bounces (i.e., depth of path tracing) */
-float m_lightIntensity = 1000.0f;   /*!<  light emission */
-
+float m_lightIntensity = 1000.0f;   /*!<  light emission intensity */
 
 // 3D objects
 std::unique_ptr<DrawableMesh> m_drawQuad;   /*!<  drawable object: screen quad */
 std::vector<Sphere> m_spheres;              /*!<  Cornell box sphere geometry */
 
 GLuint m_defaultVAO;            /*!<  default VAO */
-GLuint m_uboSpheres;            /*!<  Sphere geometry Uniform Buffer Object */
-GLuint m_ubo;
-
+GLuint m_ubo;                   /*!<  Sphere geometry Uniform Buffer Object */
 
 // Textures
 GLuint m_screenTex;             /*!< Destination texture for screen-space processing (stores final lighting result) */
@@ -52,16 +50,12 @@ GLuint m_perlinTex;
 GLuint m_programQuad;           /*!< handle of the program object (i.e. shaders) for screen quad rendering */
 GLuint m_programRay;            /*!< compute shader for ray tracing*/
 
-glm::ivec3 m_maxWorkGroupCount; /*!< work group count */
-
-std::vector<glm::vec3> m_ssaoKernel;  
-
-
-std::vector<unsigned char> m_zeroBuffer; /*!< zero buffer used to clear screen texture */
-
+glm::ivec3 m_maxWorkGroupCount;             /*!< work group count */
+std::vector<glm::vec3> m_ssaoKernel;        /*!< randomly sampled 3D vecors */
+std::vector<unsigned char> m_zeroBuffer;    /*!< zero buffer used to clear screen texture */
 
 std::string shaderDir = "../../src/shaders/";   /*!< relative path to shaders folder  */
-std::string modelDir = "../../models/";   /*!< relative path to meshes and textures files folder  */
+
 
 void initialize();
 void setupImgui(GLFWwindow *window);
@@ -120,7 +114,7 @@ void initialize()
     m_programRay = loadCompShaderProgram(shaderDir + "rayTrace.comp");
 
     buildRandKernel(m_ssaoKernel);
-    buildPerlinTex(m_perlinTex, TEX_WIDTH, TEX_HEIGHT, 100.0f);
+    buildPerlinTex(m_perlinTex, TEX_WIDTH, TEX_HEIGHT, 200.0f);
 
     createSpheresUBO(m_spheres, m_ubo);
 }
