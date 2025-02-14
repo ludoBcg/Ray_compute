@@ -397,14 +397,12 @@ void main()
 					if(isEntering)
 					{
 						ray_orig = pos - 0.015 * normalInit;
-						//tdir = normalize(ray_dir * nnt - normalInit * (ddn * nnt + sqrt(cos2t)));
 						tdir = refraction(ray_dir, -normalInit, nnt, ddn, cos2t);
 						
 					}
 					else
 					{
 						ray_orig = pos + 0.015 * normalInit;
-						//tdir = normalize(ray_dir * nnt + normalInit * (ddn * nnt + sqrt(cos2t)));
 						tdir = refraction(ray_dir, normalInit, nnt, ddn, cos2t);
 					}
 					

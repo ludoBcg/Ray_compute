@@ -213,7 +213,7 @@ void displayScreen()
  
 
         // draw screen quad with texture
-        m_drawQuad->drawScreenQuad(m_programQuad, m_screenTex, false);
+        m_drawQuad->drawScreenQuad(m_programQuad, m_screenTex);
        
 }
 

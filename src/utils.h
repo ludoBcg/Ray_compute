@@ -365,7 +365,7 @@ inline void buildRandKernel(std::vector<glm::vec3>& _ssaoKernel)
     std::default_random_engine generator;
 
     int i = 0;
-    while(i < 64)//for (unsigned int i = 0; i < 64; ++i)
+    while(i < 64)
     {
         glm::vec3 sample( randomFloats(generator) * 2.0 - 1.0, 
                           randomFloats(generator) * 2.0 - 1.0, 

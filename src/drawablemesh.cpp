@@ -87,7 +87,7 @@ void DrawableMesh::createQuadVAO()
 
 
 
-void DrawableMesh::drawScreenQuad(GLuint _program, GLuint _tex, bool _isBlurOn, bool _isGaussH, int _filterWidth)
+void DrawableMesh::drawScreenQuad(GLuint _program, GLuint _tex)
 {
 
         // Activate program
@@ -101,21 +101,6 @@ void DrawableMesh::drawScreenQuad(GLuint _program, GLuint _tex, bool _isBlurOn, 
         // https://www.khronos.org/opengl/wiki/Image_Load_Store#Format_qualifiers
         // GL_READ_ONLY as we only m,ap the image of a geometry
         glBindImageTexture(0, _tex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-
-
-
-        if(_isBlurOn)
-            glUniform1i(glGetUniformLocation(_program, "isBlurOn"), 1);
-        else
-            glUniform1i(glGetUniformLocation(_program, "isBlurOn"), 0);
-
-        if(_isGaussH)
-            glUniform1i(glGetUniformLocation(_program, "isFilterH"), 1);
-        else
-            glUniform1i(glGetUniformLocation(_program, "isFilterH"), 0);
-
-        glUniform1i(glGetUniformLocation(_program, "filterSize"), _filterWidth);
-
 
         
         glBindVertexArray(m_meshVAO);                       // bind the VAO

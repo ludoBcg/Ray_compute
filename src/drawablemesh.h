@@ -61,7 +61,7 @@ class DrawableMesh
         |                                              GETTERS/SETTERS                                                |
         +-------------------------------------------------------------------------------------------------------------*/
 
-        inline void setSSAOKernel(std::vector<glm::vec3> _ssaoKernel) { m_ssaoKernel = _ssaoKernel; }
+        inline void setSSAOKernel(std::vector<glm::vec3>& _ssaoKernel) { m_ssaoKernel = _ssaoKernel; }
         inline void setNoiseTex(GLuint _noiseTex) { m_noiseTex = _noiseTex; }
 
 
@@ -86,11 +86,8 @@ class DrawableMesh
         * \brief Draw the screen quad, mapped with a given texture
         * \param _program : shader program
         * \param _tex : texture to map on the screen quad 
-        * \param _isBlurOn : true to activate Gaussian blur
-        * \param _isGaussH : true for horizontal blur, false for vertical blur
-        * \param _filterWidth : Guassian fildter width
         */
-        void drawScreenQuad(GLuint _program, GLuint _tex, bool _isBlurOn, bool _isGaussH = true, int _filterWidth = 0 );
+        void drawScreenQuad(GLuint _program, GLuint _tex);
 
 
     protected:
@@ -108,8 +105,6 @@ class DrawableMesh
 
         int m_numVertices;          /*!< number of vertices in the VBOs */
         int m_numIndices;           /*!< number of indices in the index VBO */
-
-        GLuint m_albedoTex;         /*!< index of albedo map texture */
 
         GLuint m_noiseTex;          /*!< index of noise texture */
         std::vector<glm::vec3> m_ssaoKernel;
