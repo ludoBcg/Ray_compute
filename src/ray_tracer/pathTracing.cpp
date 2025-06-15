@@ -18,7 +18,7 @@ namespace pathTracing
 {
     // Thin lens parameters
     const double aperture = 0.0;       // radius of lens (no depth of field if set to zero) 
-    const double focal_depth = 65.0;   // distance between center of lens anf focal plane
+    const double focal_depth = 65.0;   // distance between center of lens and focal plane
 
     // Scene geometry to render (spheres or triangles)
     const bool useTriangles = false;
@@ -213,22 +213,31 @@ namespace pathTracing
             else
                 su = Vector(1.0, 0.0, 0.0);
 
-            su = (su.Cross(/*w*/sw)).Normalized();
+            su = (su.Cross(sw)).Normalized();
             Vector sv = sw.Cross(su);
-            /*Vector sv = (sw.Cross(w)).Normalized();
-            Vector su = (sv.Cross(sw)).Normalized();*/
-
+            
             // Create random sample direction l towards spherical light source
-            double cos_a_max = sqrt(1.0 - sphere.radius * sphere.radius /
-                (hitpoint - sphere.center).Dot(hitpoint - sphere.center));
+
+            // calculates maximum opening angle alpha_max:
+            // sin(a_max) =                    radius / ||sw||  <-- right triangle: sin = opposite side (i.e. radius) / adjacent side (i.e. ||sw||)
+            //     a_max  =            arcsin( radius / ||sw|| )
+            // cos(a_max) =         sqrt(1 - ( radius / ||sw|| )^2 )  <-- from: cos(arcsin(x)) = sqrt(1 - x^2)
+            //     a_max  = arccos( sqrt(1 - ( radius / ||sw|| )^2 ) )
+            double cos_a_max = sqrt( 1.0 - sphere.radius * sphere.radius /
+                                     (hitpoint - sphere.center).Dot(hitpoint - sphere.center) );
+            // randomly sample opening angle alpha in [0; alpha_max]
             double eps1 = normRand();
-            double eps2 = normRand();
             double cos_a = 1.0 - eps1 + eps1 * cos_a_max;
             double sin_a = sqrt(1.0 - cos_a * cos_a);
+
+            // randomly sample rotation angle phi in [0; 2*PI]
+            double eps2 = normRand();
             double phi = 2.0 * M_PI * eps2;
+
+            // build random vector around sw direction:
             Vector l = su * cos(phi) * sin_a +
-                sv * sin(phi) * sin_a +
-                sw * cos_a;
+                       sv * sin(phi) * sin_a +
+                       sw * cos_a;
             l = l.Normalized();
 
             // Shoot shadow ray, check if intersection is with light source
