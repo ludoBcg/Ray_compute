@@ -177,7 +177,7 @@ void renderRays()
     glUniform1i(glGetUniformLocation(m_programRay, "u_nbBounces"), m_nbBounces);
     glUniform1f(glGetUniformLocation(m_programRay, "u_lightIntensity"), m_lightIntensity);
 
-    for (unsigned int i = 0; i < 64; ++i)
+    for(unsigned int i = 0; i < 64; ++i)
     {
         std::string str = "u_samples[" + std::to_string(i) + "]";
         glm::vec3 myVec = m_ssaoKernel[i];
@@ -204,16 +204,16 @@ void renderRays()
 void displayScreen()
 {
 
-        // bind dedicated FBO
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // bind dedicated FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
-        // Clear window with background color
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Clear window with background color
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
  
 
-        // draw screen quad with texture
-        m_drawQuad->drawScreenQuad(m_programQuad, m_screenTex);
+    // draw screen quad with texture
+    m_drawQuad->drawScreenQuad(m_programQuad, m_screenTex);
        
 }
 
@@ -282,7 +282,7 @@ void runGUI()
         float frameRate = ImGui::GetIO().Framerate;
         ImGui::Text("FrameRate: %.3f ms/frame (%.1f FPS)", 1000.0f / frameRate, frameRate);
 
-        ImGui::SliderInt("Samples per pixel", &m_nbSamples, 1, 8);
+        ImGui::SliderInt("Samples per pixel", &m_nbSamples, 1, 10);
 
         ImGui::SliderInt("Number of bounces", &m_nbBounces, 1, 5);
 
