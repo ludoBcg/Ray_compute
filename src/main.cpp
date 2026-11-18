@@ -31,9 +31,10 @@ int m_winHeight = 600;              /*!<  window height */
 const unsigned int TEX_WIDTH = 512, TEX_HEIGHT = 512  ; /*!< textures dimensions  */
 
 // Path tracing parameters
-int m_nbSamples = 1;                /*!<  number of samples per pixel */
-int m_nbBounces = 2;                /*!<  number of bounces (i.e., depth of path tracing) */
-float m_lightIntensity = 1000.0f;   /*!<  light emission intensity */
+int m_nbSamples = 1;                        /*!<  number of samples per pixel */
+int m_nbBounces = 2;                        /*!<  number of bounces (i.e., depth of path tracing) */
+float m_lightIntensity = 1000.0f;           /*!<  light emission intensity */
+glm::vec2 m_lookAtPoint = glm::vec3(0.0f);  /*!<  camera view direction in image space */
 
 // 3D objects
 std::unique_ptr<DrawableMesh> m_drawQuad;   /*!<  drawable object: screen quad */
@@ -125,9 +126,9 @@ void setupImgui(GLFWwindow *window)
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    // enable keyboard controls?
+    // Scale font for hdpi screen 
+    ImFontConfig cfg;
+    ImGui::GetIO().Fonts->AddFontDefault(&cfg)->Scale = 1.5f;
     ImGui::StyleColorsDark();
     // platform and renderer bindings
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -176,6 +177,7 @@ void renderRays()
     glUniform1i(glGetUniformLocation(m_programRay, "u_nbSamples"), m_nbSamples);
     glUniform1i(glGetUniformLocation(m_programRay, "u_nbBounces"), m_nbBounces);
     glUniform1f(glGetUniformLocation(m_programRay, "u_lightIntensity"), m_lightIntensity);
+    glUniform2fv(glGetUniformLocation(m_programRay, "u_lookAtPoint"), 1, &m_lookAtPoint[0]);
 
     for(unsigned int i = 0; i < 64; ++i)
     {
@@ -245,7 +247,29 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
     // return to init positon when "R" pressed
     if (key == GLFW_KEY_R && action == GLFW_PRESS) 
     {
-       
+        m_lookAtPoint = glm::vec3(0.0f);
+    }
+
+    // Arrow keys for light source position control
+    if (key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        if (m_lookAtPoint.x < 1.0f)
+            m_lookAtPoint.x += 0.1f;
+    }
+    else if (key == GLFW_KEY_LEFT && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        if (m_lookAtPoint.x > -1.0f)
+            m_lookAtPoint.x -= 0.1f;
+    }
+    else if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        if (m_lookAtPoint.y > -1.0f)
+            m_lookAtPoint.y -= 0.1f;
+    }
+    else if (key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        if (m_lookAtPoint.y < 1.0f)
+            m_lookAtPoint.y += 0.1f;
     }
 }
 
